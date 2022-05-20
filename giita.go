@@ -20,7 +20,7 @@ import (
 var (
 	source string
 	rePunc = regexp.MustCompile(`^\pP+`)
-	reIsNotExeptPunc = regexp.MustCompile(`^[^’-“„	"«'‘‚]+`)
+	reIsNotExeptPunc = regexp.MustCompile(`^[^’-“„	"«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
 
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
