@@ -2,7 +2,7 @@ CLI tool to format latin script pali for chanting in the Makhot style of the Dha
 
 This script implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
-
+<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
 
 Please note:
 - the **input file needs to be UTF-8 encoded**. Windows users, especially prior to windows 10, should be aware of this.
