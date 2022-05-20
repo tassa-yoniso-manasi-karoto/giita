@@ -65,9 +65,8 @@ var (
   vertical-align: -13%;
 }
 
-:not(.long){
- /*font-weight: 300;
- text-decoration: underline ;*/
+:not(.long):not(body,html){
+ /*font-weight: 300;*/
 }
 </style></head>
 <body>`
@@ -128,6 +127,9 @@ type SyllableType struct {
 func main() {
 	source = strings.ReplaceAll(source, "ṇ", "ṅ")
 	source = strings.ReplaceAll(source, "ṃ", "ṁ")
+	// chunks from long compound words need to be reunited or will be 
+	// treated as separate
+	source = strings.ReplaceAll(source, "-", "")
 	var UnitStack []UnitType
 	for source != "" {
 		notFound := true
