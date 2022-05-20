@@ -11,7 +11,7 @@ This script implements the tone rules provided at https://www.dhammatalks.org/eb
 - the above mentionned guide does not provide a way to identify syllables which can get the optional low tone therefore this is not implemented
 - optional high tones are disabled by default and *will* result in false positives
 - this script is provided here "for posterity" and will not be actively maintained
-- keep in mind that syllable delimitations and tone rules are subject exceptions and the guidance provided by the formatting may not be accurate !
+- keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting may not be accurate!
 
 ### Usage of giita:
     -i string
