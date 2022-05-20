@@ -41,7 +41,7 @@ var (
 	out *string
 	t, wantOptionalHigh *bool
 	wantHtml = true
-	htmlpage = `<!DOCTYPE html> <html><style>
+	htmlpage = `<!DOCTYPE html> <html><head><style>
 .separator::before{
   content: "⸱";
 }
@@ -69,7 +69,7 @@ var (
  /*font-weight: 300;
  text-decoration: underline ;*/
 }
-</style>
+</style></head>
 <body>`
 )
 
