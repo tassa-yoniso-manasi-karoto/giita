@@ -21,6 +21,6 @@ This script implements the tone rules provided at https://www.dhammatalks.org/eb
     -o string
       path of output file (default: directory of executable + "output.htm")
     -optionalhigh
-      used with -t it formats optional high tones with capital letters just like true high tones (turn on with -optionalhigh=true)
+      requires -t, it formats optional high tones with capital letters just like true high tones (turn on with -optionalhigh=true)
     -t
       use raw text format instead of HTML for the output file (turn on with -t=true)
