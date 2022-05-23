@@ -29,10 +29,11 @@ var (
 	reLongVowels []*regexp.Regexp
 	reShortVowels []*regexp.Regexp
 
-	Consonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
+	Consonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
 	AspiratedConsonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
 	UnstoppingCar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
-	HighToneFirstCar = []string{"s", "h", "ch", "th", "ṭh", "kh", "ph"}
+	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported atm.
+	HighToneFirstCar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptionalHighToneFirstCar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 	reConsonants []*regexp.Regexp
 
@@ -72,6 +73,17 @@ var (
 <body>`
 )
 
+type UnitType struct {
+	Str     string
+	Type    string
+	Len     string
+	Closing bool
+}
+type SyllableType struct {
+	Units                               	[]UnitType
+	isLong, NotStopped, hasHighToneFirstCar	bool
+	TrueHigh, OptionalHigh			bool
+}
 
 func init() {
 	e, err := os.Executable()
@@ -83,7 +95,7 @@ func init() {
 	in = flag.String("i", CurrentDir + "/input.txt", "path of input UTF-8 encoded text file")
 	out = flag.String("o", CurrentDir + "/output.htm", "path of output file")
 	t = flag.Bool("t", false , "use raw text format instead of HTML for the output file (turn on with -t=true)")
-	wantOptionalHigh = flag.Bool("optionalhigh", false , "used with -t it formats optional high tones with capital letters just like true high tones (turn on with -optionalhigh=true)")
+	wantOptionalHigh = flag.Bool("optionalhigh", false , "requires -t, it formats optional high tones with capital letters just like true high tones (turn on with -optionalhigh=true)")
 	flag.Parse()
 	if *t {
 		wantHtml = false
@@ -112,17 +124,6 @@ func init() {
 	}
 }
 
-type UnitType struct {
-	Str     string
-	Type    string
-	Len     string
-	Closing bool
-}
-type SyllableType struct {
-	Units                                 []UnitType
-	isLong, NotStopped, hasHighToneFirstCar bool
-	TrueHigh, OptionalHigh bool
-}
 
 func main() {
 	source = strings.ReplaceAll(source, "ṇ", "ṅ")
