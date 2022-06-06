@@ -215,7 +215,6 @@ func main() {
 		} else {
 			unit.Closing = false
 		}
-		UnitStack[i] = unit
 		//----
 		if (PrevUnit.Type == "Punctuation" || PrevUnit.Type == "Space") &&
 		!(unit.Type == "Punctuation" || unit.Type == "Space") {
@@ -336,6 +335,7 @@ func main() {
 		}
 		// check: unless it appear as the last char in a row visually,
 		// if char is letter and  next char too, add separator
+		// FIXME <br> actually only occurs after a point/comma, fix or rm
 		if len(Syllables) > h+1 &&
 		Syllables[h+1].Units[0].Str != "<br>" &&
 		isLetterChar(Syllable.Units[len(Syllable.Units)-1].Type) &&
