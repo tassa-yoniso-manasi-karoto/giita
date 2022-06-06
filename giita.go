@@ -184,10 +184,7 @@ func main() {
 		Syllable SyllableType
 	)
 	for i, unit := range UnitStack {
-		var (
-			isShortVowel bool
-			PrevUnit, NextUnit, NextNextUnit UnitType
-		)
+		var PrevUnit, NextUnit, NextNextUnit UnitType
 		if len(UnitStack) > i+2 {
 			NextNextUnit = UnitStack[i+2]
 			NextUnit = UnitStack[i+1]
@@ -242,19 +239,23 @@ func main() {
 			if (unit.Type == "Punctuation" || unit.Type == "Space") {
 				Syllable.Irrelevant = true
 			}
-			if (unit.Type == "ShortVowel" && (NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ")) ||
-				(unit.Type == "ShortVowel" && NextUnit.Type == "Consonant" && NextUnit.Closing) ||
-				(unit.Type == "LongVowel") {
+			if (unit.Type == "ShortVowel" &&
+			(NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ")) ||
+			(unit.Type == "ShortVowel" && NextUnit.Type == "Consonant" && NextUnit.Closing) ||
+			(unit.Type == "LongVowel") {
 				Syllable.isLong = true
 			}
-			if contains(UnstoppingCar, strings.ToLower(unit.Str)) && unit.Closing ||
-				(unit.Type == "LongVowel" && unit.Closing) {
+			if contains(UnstoppingCar, strings.ToLower(unit.Str)) &&
+			unit.Closing ||
+			(unit.Type == "LongVowel" && unit.Closing) {
 				Syllable.NotStopped = true
 			}
 			if contains(HighToneFirstCar, strings.ToLower(Syllable.Units[0].Str)) {
 				Syllable.hasHighToneFirstCar = true
 			}
-			if Syllable.hasHighToneFirstCar && Syllable.NotStopped && Syllable.isLong {
+			if Syllable.hasHighToneFirstCar &&
+			Syllable.NotStopped &&
+			Syllable.isLong {
 				Syllable.TrueHigh = true
 				if Syllable.TrueHigh && !wantHtml {
 					for k, unit := range Syllable.Units {
