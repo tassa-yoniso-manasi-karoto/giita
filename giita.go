@@ -48,8 +48,8 @@ var (
 <style>
 body {
   font-size: 34px;
-  letter-spacing: -0.07em;
   line-height: 3.6rem;
+  letter-spacing: -0.07em;
 }
 
 .w {
@@ -148,6 +148,17 @@ func main() {
 	var UnitStack []UnitType
 	for source != "" {
 		notFound := true
+		if rePunc.MatchString(source) {
+			found := rePunc.FindString(source)
+			UnitStack = append(UnitStack, UnitType{Str: found, Type: "Punctuation"})
+			source = strings.TrimPrefix(source, found)
+			notFound = false
+		} else if reSpace.MatchString(source) {
+			found := reSpace.FindString(source)
+			UnitStack = append(UnitStack, UnitType{Str: found, Type: "Space"})
+			source = strings.TrimPrefix(source, found)
+			notFound = false
+		}
 		for i, list := range [][]*regexp.Regexp{reLongVowels, reShortVowels, reConsonants} {
 			for _, re := range list {
 				if re.MatchString(source) {
@@ -156,25 +167,16 @@ func main() {
 					source = strings.TrimPrefix(source, found)
 					notFound = false
 					break
-				} else if rePunc.MatchString(source) {
-					found := rePunc.FindString(source)
-					UnitStack = append(UnitStack, UnitType{Str: found, Type: "Punctuation"})
-					source = strings.TrimPrefix(source, found)
-					notFound = false
-					break
-				} else if reSpace.MatchString(source) {
-					found := reSpace.FindString(source)
-					UnitStack = append(UnitStack, UnitType{Str: found, Type: "Space"})
-					source = strings.TrimPrefix(source, found)
-					notFound = false
-					break
 				}
+			}
+			if !notFound {
+				break
 			}
 		}
 		if notFound {
-			found := strings.Split(source, "")[0]
-			source = strings.TrimPrefix(source, found)
-			fmt.Printf("'%s' : Unknown\n", found)
+			car := strings.Split(source, "")[0]
+			source = strings.TrimPrefix(source, car)
+			fmt.Printf("'%s' : Unknown\n", car)
 		}
 	}
 	var (
@@ -184,15 +186,8 @@ func main() {
 	for i, unit := range UnitStack {
 		var (
 			isShortVowel bool
-			PrevUnit UnitType
-			NextNextUnit UnitType
-			NextUnit UnitType
+			PrevUnit, NextUnit, NextNextUnit UnitType
 		)
-		for _, re := range reShortVowels {
-			if re.MatchString(unit.Str) {
-				isShortVowel = true
-			}
-		}
 		if len(UnitStack) > i+2 {
 			NextNextUnit = UnitStack[i+2]
 			NextUnit = UnitStack[i+1]
@@ -201,27 +196,29 @@ func main() {
 			PrevUnit = UnitStack[i-1]
 		}
 		//assume true, overwrite everything after setting exceptions
-		unit.Closing = true
-		UnitStack[i] = unit
-		if isShortVowel &&
+		unit.Closing = true		
+			// case SU-PA-ṬI-pan-no
+		if unit.Type == "ShortVowel" &&
 		!(NextUnit.Type == "Consonant" && NextNextUnit.Type == "Consonant") &&
 		!(NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ") &&
 		!(contains(AspiratedConsonants, NextUnit.Str) &&
 		PrevUnit.Type != "Consonant") {
+			// case HO-mi
 		} else if unit.Type == "LongVowel" &&
 		!(NextUnit.Type == "Consonant" && NextNextUnit.Type == "Consonant") &&
 		!(NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ") {
-			// case sam-mā
+			// case SAM-mā
 		} else if unit.Type == "Consonant" &&
 		NextUnit.Type == "Consonant" &&
 		(PrevUnit.Type == "LongVowel" || PrevUnit.Type == "ShortVowel") {
+			// case DHAM-mo
 		} else if contains(UnstoppingCar, strings.ToLower(unit.Str)) &&
 		!(NextUnit.Type == "LongVowel" || NextUnit.Type == "ShortVowel") &&
 		(PrevUnit.Type == "LongVowel" || PrevUnit.Type == "ShortVowel") {
 		} else {
 			unit.Closing = false
-			UnitStack[i] = unit
 		}
+		UnitStack[i] = unit
 		//----
 		if (PrevUnit.Type == "Punctuation" || PrevUnit.Type == "Space") &&
 		!(unit.Type == "Punctuation" || unit.Type == "Space") {
