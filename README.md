@@ -1,6 +1,6 @@
 CLI tool to format latin script Pali for chanting in the Thai style.
 
-This script was written with the Makhot style of the Dhammayut order (ธรรมยุติกนิกาย) in mind but its output can also be used for the style of the Maha Nikaya order (Saṁyok).
+This script was written with the Makhot style of the Dhammayut order (ธรรมยุติกนิกาย) in mind but its output can also be used for the Saṁyok style of the Maha Nikaya order.
 This script implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
