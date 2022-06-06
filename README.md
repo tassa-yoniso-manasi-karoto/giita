@@ -24,3 +24,5 @@ This script implements the tone rules provided at https://www.dhammatalks.org/eb
       requires -t, it formats optional high tones with capital letters just like true high tones (turn on with -optionalhigh=true)
     -t
       use raw text format instead of HTML for the output file (turn on with -t=true)
+      
+Download: [Releases](https://github.com/tassa-yoniso-manasi-karoto/giita/releases)
