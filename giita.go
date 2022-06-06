@@ -12,15 +12,16 @@ import (
 	"html"
 	"bufio"
 )
-// const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
+// const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
-// var test string = "arahaṁ, abhivādemi, supaṭipanno, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
+// var test string = "arahaṁ, abhivādemi, supaṭipanno, sambuddho, svākkhāto, tassa, metta, ahaṁ, homi, avero, dhammo, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
+
 
 
 var (
 	source string
 	rePunc = regexp.MustCompile(`^\pP+`)
-	reIsNotExeptPunc = regexp.MustCompile(`^[^’-“„	"«'‘‚-]+`)
+	reIsNotExeptPunc = regexp.MustCompile(`^[^-“„	"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
 
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
@@ -42,14 +43,26 @@ var (
 	out *string
 	t, wantOptionalHigh *bool
 	wantHtml = true
-	htmlpage = `<!DOCTYPE html> <html><head><style>
-.separator::before{
+	htmlpage = `<!DOCTYPE html> <html><head>
+<meta charset="UTF-8">
+<style>
+body {
+  font-size: 34px;
+  letter-spacing: -0.07em;
+  line-height: 3.6rem;
+}
+
+.w {
+  white-space: nowrap;
+}
+
+.s::before{
   content: "⸱";
 }
 
 .punct::after{
   content: "█";
-  color: grey;
+  color: orangered; /*#5c5c5c;*/
 }
 
 .truehigh{
@@ -66,7 +79,7 @@ var (
   vertical-align: -13%;
 }
 
-:not(.long):not(body,html){
+.short {
  /*font-weight: 300;*/
 }
 </style></head>
@@ -82,6 +95,7 @@ type UnitType struct {
 type SyllableType struct {
 	Units                               	[]UnitType
 	isLong, NotStopped, hasHighToneFirstCar	bool
+	Irrelevant				bool
 	TrueHigh, OptionalHigh			bool
 }
 
@@ -208,12 +222,13 @@ func main() {
 			unit.Closing = false
 			UnitStack[i] = unit
 		}
+		//----
 		if (PrevUnit.Type == "Punctuation" || PrevUnit.Type == "Space") &&
 		!(unit.Type == "Punctuation" || unit.Type == "Space") {
 			Syllables = append(Syllables, Syllable)
-			Syllable = *new(SyllableType)			
+			Syllable = *new(SyllableType)
 		}
-		Syllable.Units = append(Syllable.Units, unit)		
+		Syllable.Units = append(Syllable.Units, unit)
 		if unit.Closing ||
 		((NextUnit.Type == "Punctuation" || NextUnit.Type == "Space") &&
 		!(unit.Type == "Punctuation" || unit.Type == "Space")) {
@@ -226,6 +241,9 @@ func main() {
 			var NextUnit UnitType
 			if len(Syllable.Units) > i+1 {
 				NextUnit = Syllable.Units[i+1]
+			}
+			if (unit.Type == "Punctuation" || unit.Type == "Space") {
+				Syllable.Irrelevant = true
 			}
 			if (unit.Type == "ShortVowel" && (NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ")) ||
 				(unit.Type == "ShortVowel" && NextUnit.Type == "Consonant" && NextUnit.Closing) ||
@@ -269,19 +287,27 @@ func main() {
 	separator := "⸱"
 	span := "<span class=\"%s\">"
 	if wantHtml {
-		separator = "<span class=\"separator\"></span>"
+		separator = "<span class=s></span>"
 	}
+	openword := false
 	for h, Syllable := range Syllables {
+		if !Syllable.Irrelevant && !openword {
+			fmt.Fprintf(buf, span, "w")
+			openword = true
+		} else if Syllable.Irrelevant && openword {
+			buf.WriteString("</span>")
+			openword = false
+		}
+		
 		class := ""
 		if Syllable.whichTone() != "none" {
 			class += Syllable.whichTone()
 		}
 		if Syllable.isLong {
-			if class != "" {
-				class += " "
-			}
-			class += "long"
-		}		
+			class = appendClass(class, "long")
+		} else if !Syllable.Irrelevant {
+			class = appendClass(class, "short")
+		}	
 		if class != "" && wantHtml {
 			fmt.Fprintf(buf, span, class)
 		}
@@ -292,7 +318,7 @@ func main() {
 				}
 				buf.WriteString(unit.Str)
 			} else if reSpace.MatchString(unit.Str) {
-				buf.WriteString(" ")
+				buf.WriteString(" &nbsp;")
 			} else if rePunc.MatchString(unit.Str) && reIsNotExeptPunc.MatchString(unit.Str) {
 				if wantHtml {
 					buf.WriteString(html.EscapeString(unit.Str) + "<span class=\"punct\"></span>")
@@ -333,7 +359,15 @@ func main() {
 }
 
 
-func isLetterChar(s string) (bool) {
+func appendClass(class, s string) string {
+	if class != "" {
+		class += " "
+	}
+	class += s
+	return class
+}
+
+func isLetterChar(s string) bool {
 	b := true
 	if s == "Punctuation" {
 		b = false
