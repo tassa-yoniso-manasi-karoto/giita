@@ -4,6 +4,7 @@ This script was written with the Makhot style of the Dhammayut order (ธรร�
 This script implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
+<p align="center">Try it on CodePen: https://codepen.io/tassa-yoniso-manasi-karoto/pen/poaOedv</p>
 
 ### Please note:
 - the **input file needs to be UTF-8 encoded**. Windows users, especially prior to windows 10, should be aware of this.
