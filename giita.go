@@ -16,13 +16,14 @@ import (
 
 // var test string = "arahaṁ, abhivādemi, supaṭipanno, sambuddho, svākkhāto, tassa, metta, ahaṁ, homi, avero, dhammo, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
 
-
+// TODO flag to load the CSS from a file
 
 var (
 	source string
 	rePunc = regexp.MustCompile(`^\pP+`)
 	reIsNotExeptPunc = regexp.MustCompile(`^[^-“’„	"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
+	newline = "<br>"
 
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
 	LongVowels = []string{"ā", "e", "ī", "o", "ū", "ay"}
@@ -31,25 +32,26 @@ var (
 	reShortVowels []*regexp.Regexp
 
 	Consonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
+	reConsonants []*regexp.Regexp
+	
 	AspiratedConsonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
 	UnstoppingCar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
 	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported atm.
 	HighToneFirstCar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptionalHighToneFirstCar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
-	reConsonants []*regexp.Regexp
 
 	CurrentDir string
-	in *string
-	out *string
-	t, wantOptionalHigh *bool
+	in, out *string
+	wantNewlineNum, wantFontSize *int
+	wantTxt, wantOptionalHigh, wantDark *bool
 	wantHtml = true
-	htmlpage = `<!DOCTYPE html> <html><head>
+	page = `<!DOCTYPE html> <html><head>
 <meta charset="UTF-8">
 <style>
 body {
-  font-size: 34px;
-  line-height: 3.6rem;
-  letter-spacing: -0.07em;
+  font-size: %dpx;
+  line-height: 1.4em;
+  letter-spacing: -0.03em;
 }
 
 .w {
@@ -108,16 +110,24 @@ func init() {
 	}
 	in = flag.String("i", CurrentDir + "/input.txt", "path of input UTF-8 encoded text file")
 	out = flag.String("o", CurrentDir + "/output.htm", "path of output file")
-	t = flag.Bool("t", false , "use raw text format instead of HTML for the output file (turn on with -t=true)")
+	wantTxt = flag.Bool("t", false , "use raw text format instead of HTML for the output file (turn on with -t=true)")
 	wantOptionalHigh = flag.Bool("optionalhigh", false , "requires -t, it formats optional high tones with capital letters just like true high tones (turn on with -optionalhigh=true)")
+	wantDark = flag.Bool("d", false , "dark mode, will use a white font on a dark background")
+	wantNewlineNum = flag.Int("l", 1 , "set how many linebreaks will be created from a single linebreak in the input file. Advisable to use 2 or 3 for smartphone/tablet/e-reader.")
+	wantFontSize = flag.Int("f", 34 , "set font size")
 	flag.Parse()
-	if *t {
+	page = fmt.Sprintf(page, *wantFontSize)
+	if *wantTxt {
 		wantHtml = false
-		htmlpage = ""
+		newline = "\n"
+		page = ""
 		if !isFlagPassed("o") {
 			*out = CurrentDir + "/output.txt"
 		}
+	} else if *wantDark {
+		page = strings.Replace(page, "body {", "body {\nbackground: black;\n  color: white;", 1)
 	}
+	newline = strings.Repeat(newline, *wantNewlineNum)
 	fmt.Println("In:", *in)
 	fmt.Println("Out:", *out)
 	dat, err := os.ReadFile(*in)
@@ -280,7 +290,7 @@ func main() {
 			Syllables[h] = Syllable
 		}
 	}
-	buf := bytes.NewBufferString(htmlpage)
+	buf := bytes.NewBufferString(page)
 	separator := "⸱"
 	span := "<span class=\"%s\">"
 	if wantHtml {
@@ -288,10 +298,10 @@ func main() {
 	}
 	openword := false
 	for h, Syllable := range Syllables {
-		if !Syllable.Irrelevant && !openword {
+		if wantHtml && !Syllable.Irrelevant && !openword {
 			fmt.Fprintf(buf, span, "w")
 			openword = true
-		} else if Syllable.Irrelevant && openword {
+		} else if wantHtml && Syllable.Irrelevant && openword {
 			buf.WriteString("</span>")
 			openword = false
 		}
@@ -310,12 +320,13 @@ func main() {
 		}
 		for _, unit := range Syllable.Units {
 			if strings.Contains(unit.Str, "\n") {
-				if wantHtml {
-					unit.Str = strings.ReplaceAll(unit.Str, "\n", "<br>")
-				}
+				unit.Str = strings.ReplaceAll(unit.Str, "\n", newline)
 				buf.WriteString(unit.Str)
 			} else if reSpace.MatchString(unit.Str) {
-				buf.WriteString(" &nbsp;")
+				buf.WriteString(" ")
+				if wantHtml {
+					buf.WriteString("&nbsp;")
+				}
 			} else if rePunc.MatchString(unit.Str) && reIsNotExeptPunc.MatchString(unit.Str) {
 				if wantHtml {
 					buf.WriteString(html.EscapeString(unit.Str) + "<span class=\"punct\"></span>")
