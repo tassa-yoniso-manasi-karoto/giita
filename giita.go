@@ -10,19 +10,20 @@ import (
 	"bytes"
 	"flag"
 	"html"
-	"bufio"
 )
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
 // var test string = "arahaṁ, abhivādemi, supaṭipanno, sambuddho, svākkhāto, tassa, metta, ahaṁ, homi, avero, dhammo, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
 
 // TODO flag to load the CSS from a file
+// TODO write (U UnitType) isIrrelevant(), (U UnitType) isVowel() and refactor everything
 
 var (
 	source string
 	rePunc = regexp.MustCompile(`^\pP+`)
 	reIsNotExeptPunc = regexp.MustCompile(`^[^-“’„	"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
+	reComment = regexp.MustCompile(`(?s)\[.*?\]`)
 	newline = "<br>"
 
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
@@ -35,11 +36,12 @@ var (
 	reConsonants []*regexp.Regexp
 	
 	AspiratedConsonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
-	UnstoppingCar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
+	UnstoppingChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
 	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported atm.
-	HighToneFirstCar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
-	OptionalHighToneFirstCar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
+	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
+	OptionalHighToneFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 
+	debug bool
 	CurrentDir string
 	in, out *string
 	wantNewlineNum, wantFontSize *int
@@ -69,7 +71,18 @@ body {
 
 .truehigh{
   font-weight: bold;
-  vertical-align: 13%;
+  vertical-align: 13%%;
+}
+
+.comment {
+  background: lightgrey;
+  font-style: italic;
+}
+.comment::before {
+  content: "[";
+}
+.comment::after {
+  content: "]";
 }
 
 .optionalhigh{
@@ -78,7 +91,7 @@ body {
 
 .low {
   /*Low tones: Not implemented!*/
-  vertical-align: -13%;
+  vertical-align: -13%%;
 }
 
 .short {
@@ -95,10 +108,10 @@ type UnitType struct {
 	Closing bool
 }
 type SyllableType struct {
-	Units                               	[]UnitType
-	isLong, NotStopped, hasHighToneFirstCar	bool
-	Irrelevant				bool
-	TrueHigh, OptionalHigh			bool
+	Units                               		[]UnitType
+	isLong, NotStopped, hasHighToneFirstChar	bool
+	Irrelevant					bool
+	TrueHigh, OptionalHigh				bool
 }
 
 func init() {
@@ -125,7 +138,9 @@ func init() {
 			*out = CurrentDir + "/output.txt"
 		}
 	} else if *wantDark {
-		page = strings.Replace(page, "body {", "body {\nbackground: black;\n  color: white;", 1)
+		page = strings.Replace(page, "body {", "body {\n  background: black;\n  color: white;", 1)
+		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";", ".s::before{\n  content: \"⸱\";\n  color: darkgrey;", 1)
+		page = strings.Replace(page, ".comment {\n  background: lightgrey;", ".comment {\n  background: darkgrey;", 1)
 	}
 	newline = strings.Repeat(newline, *wantNewlineNum)
 	fmt.Println("In:", *in)
@@ -155,6 +170,9 @@ func main() {
 	// chunks from long compound words need to be reunited or will be 
 	// treated as separate
 	source = strings.ReplaceAll(source, "-", "")
+	comments := reComment.FindAllString(source, -1)
+	source = reComment.ReplaceAllString(source, "𓃰")
+	
 	var UnitStack []UnitType
 	for source != "" {
 		notFound := true
@@ -184,9 +202,12 @@ func main() {
 			}
 		}
 		if notFound {
-			car := strings.Split(source, "")[0]
-			source = strings.TrimPrefix(source, car)
-			fmt.Printf("'%s' : Unknown\n", car)
+			char := strings.Split(source, "")[0]
+			UnitStack = append(UnitStack, UnitType{Str: char, Type: "Other"})
+			source = strings.TrimPrefix(source, char)
+			if debug {
+				fmt.Printf("'%s' : Character unknown\n", char)
+			}
 		}
 	}
 	var (
@@ -219,7 +240,7 @@ func main() {
 		NextUnit.Type == "Consonant" &&
 		(PrevUnit.Type == "LongVowel" || PrevUnit.Type == "ShortVowel") {
 			// case DHAM-mo
-		} else if contains(UnstoppingCar, strings.ToLower(unit.Str)) &&
+		} else if contains(UnstoppingChar, strings.ToLower(unit.Str)) &&
 		!(NextUnit.Type == "LongVowel" || NextUnit.Type == "ShortVowel") &&
 		(PrevUnit.Type == "LongVowel" || PrevUnit.Type == "ShortVowel") {
 		} else {
@@ -245,7 +266,7 @@ func main() {
 			if len(Syllable.Units) > i+1 {
 				NextUnit = Syllable.Units[i+1]
 			}
-			if (unit.Type == "Punctuation" || unit.Type == "Space") {
+			if (unit.Type == "Punctuation" || unit.Type == "Space" || unit.Type == "Other") {
 				Syllable.Irrelevant = true
 			}
 			if (unit.Type == "ShortVowel" &&
@@ -254,15 +275,15 @@ func main() {
 			(unit.Type == "LongVowel") {
 				Syllable.isLong = true
 			}
-			if contains(UnstoppingCar, strings.ToLower(unit.Str)) &&
+			if contains(UnstoppingChar, strings.ToLower(unit.Str)) &&
 			unit.Closing ||
 			(unit.Type == "LongVowel" && unit.Closing) {
 				Syllable.NotStopped = true
 			}
-			if contains(HighToneFirstCar, strings.ToLower(Syllable.Units[0].Str)) {
-				Syllable.hasHighToneFirstCar = true
+			if contains(HighToneFirstChar, strings.ToLower(Syllable.Units[0].Str)) {
+				Syllable.hasHighToneFirstChar = true
 			}
-			if Syllable.hasHighToneFirstCar &&
+			if Syllable.hasHighToneFirstChar &&
 			Syllable.NotStopped &&
 			Syllable.isLong {
 				Syllable.TrueHigh = true
@@ -274,9 +295,9 @@ func main() {
 			}
 			//---
 			if !Syllable.TrueHigh && unit.Type == "ShortVowel" &&
-			contains(OptionalHighToneFirstCar, strings.ToLower(Syllable.Units[0].Str)) {
+			contains(OptionalHighToneFirstChar, strings.ToLower(Syllable.Units[0].Str)) {
 				if unit.Closing ||
-				!contains(UnstoppingCar, strings.ToLower(NextUnit.Str)) {
+				!contains(UnstoppingChar, strings.ToLower(NextUnit.Str)) {
 					Syllable.OptionalHigh = true
 				}
 				if Syllable.OptionalHigh && !wantHtml && *wantOptionalHigh {
@@ -357,13 +378,14 @@ func main() {
 	if wantHtml {
 		buf.WriteString("</body></html>")
 	}
-	fo, err := os.Create(*out)
+	// maybe just discard buf for a modifiable string
+	outstr := buf.String()
+	for _, comment := range comments {
+		comment ="<span class=comment>" + comment[1:len(comment)-1] + "</span>"
+		outstr = strings.Replace(outstr, "𓃰", comment, 1)
+	}
+	err := os.WriteFile(*out, []byte(outstr), 0644)
 	check(err)
-	defer fo.Close()
-	w := bufio.NewWriter(fo)
-	_, err = buf.WriteTo(w)
-	check(err)
-	w.Flush()
 	fmt.Println("Done")
 }
 
