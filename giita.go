@@ -16,7 +16,6 @@ import (
 // var test string = "arahaṁ, abhivādemi, supaṭipanno, sambuddho, svākkhāto, tassa, metta, ahaṁ, homi, avero, dhammo, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
 
 // TODO flag to load the CSS from a file
-// TODO write (U UnitType) isIrrelevant(), (U UnitType) isVowel() and refactor everything
 
 var (
 	source string
@@ -29,6 +28,7 @@ var (
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
 	LongVowels = []string{"ā", "e", "ī", "o", "ū", "ay"}
 	ShortVowels = []string{"a", "i", "u"}
+	VowelTypes = []string{"ShortVowel", "LongVowel"}
 	reLongVowels []*regexp.Regexp
 	reShortVowels []*regexp.Regexp
 
@@ -40,9 +40,10 @@ var (
 	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported atm.
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptionalHighToneFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
+	IrrelevantTypes = []string{"Punctuation", "Space", "Other"}
 
 	debug bool
-	CurrentDir string
+	CurrentDir, refCmt string
 	in, out *string
 	wantNewlineNum, wantFontSize *int
 	wantTxt, wantOptionalHigh, wantDark *bool
@@ -79,10 +80,10 @@ body {
   font-style: italic;
 }
 .comment::before {
-  content: "[";
+  content: "%s";
 }
 .comment::after {
-  content: "]";
+  content: "%s";
 }
 
 .optionalhigh{
@@ -121,15 +122,21 @@ func init() {
 	} else {
 		CurrentDir = path.Dir(e)
 	}
-	in = flag.String("i", CurrentDir + "/input.txt", "path of input UTF-8 encoded text file")
-	out = flag.String("o", CurrentDir + "/output.htm", "path of output file")
-	wantTxt = flag.Bool("t", false , "use raw text format instead of HTML for the output file (turn on with -t=true)")
-	wantOptionalHigh = flag.Bool("optionalhigh", false , "requires -t, it formats optional high tones with capital letters just like true high tones (turn on with -optionalhigh=true)")
-	wantDark = flag.Bool("d", false , "dark mode, will use a white font on a dark background")
-	wantNewlineNum = flag.Int("l", 1 , "set how many linebreaks will be created from a single linebreak in the input file. Advisable to use 2 or 3 for smartphone/tablet/e-reader.")
+	in = flag.String("i", CurrentDir + "/input.txt", "path of input UTF-8 encoded text file\n")
+	out = flag.String("o", CurrentDir + "/output.htm", "path of output file\n")
+	refCmt = *flag.String("c", "[:]", "allow comments in input file and specify which characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
+	//---
+	wantTxt = flag.Bool("t", false , "use raw text instead of HTML for the output file (on with -t=true)")
+	wantOptionalHigh = flag.Bool("optionalhigh", false , "requires -t, it formats optional high tones with capital letters\njust like true high tones (on with -optionalhigh=true)")
+	wantDark = flag.Bool("d", false , "dark mode, will use a white font on a dark background (on with -d=true)")
+	//---
+	wantNewlineNum = flag.Int("l", 1 , "set how many linebreaks will be created from a single linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
 	wantFontSize = flag.Int("f", 34 , "set font size")
 	flag.Parse()
-	page = fmt.Sprintf(page, *wantFontSize)
+	if len(refCmt) != 3 {
+		panic("You provided an invalid input of comment marks.")
+	}
+	page = fmt.Sprintf(page, *wantFontSize, refCmt[0:1], refCmt[2:3])
 	if *wantTxt {
 		wantHtml = false
 		newline = "\n"
@@ -229,8 +236,7 @@ func main() {
 		if unit.Type == "ShortVowel" &&
 		!(NextUnit.Type == "Consonant" && NextNextUnit.Type == "Consonant") &&
 		!(NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ") &&
-		!(contains(AspiratedConsonants, NextUnit.Str) &&
-		PrevUnit.Type != "Consonant") {
+		!(contains(AspiratedConsonants, NextUnit.Str) && PrevUnit.Type != "Consonant") {
 			// case HO-mi
 		} else if unit.Type == "LongVowel" &&
 		!(NextUnit.Type == "Consonant" && NextNextUnit.Type == "Consonant") &&
@@ -238,24 +244,24 @@ func main() {
 			// case SAM-mā
 		} else if unit.Type == "Consonant" &&
 		NextUnit.Type == "Consonant" &&
-		(PrevUnit.Type == "LongVowel" || PrevUnit.Type == "ShortVowel") {
+		contains(VowelTypes, PrevUnit.Type) {
 			// case DHAM-mo
 		} else if contains(UnstoppingChar, strings.ToLower(unit.Str)) &&
-		!(NextUnit.Type == "LongVowel" || NextUnit.Type == "ShortVowel") &&
-		(PrevUnit.Type == "LongVowel" || PrevUnit.Type == "ShortVowel") {
+		!contains(VowelTypes, NextUnit.Type) &&
+		contains(VowelTypes, PrevUnit.Type) {
 		} else {
 			unit.Closing = false
 		}
 		//----
-		if (PrevUnit.Type == "Punctuation" || PrevUnit.Type == "Space") &&
-		!(unit.Type == "Punctuation" || unit.Type == "Space") {
+		if contains(IrrelevantTypes, PrevUnit.Type) &&
+		!contains(IrrelevantTypes, unit.Type) {
 			Syllables = append(Syllables, Syllable)
 			Syllable = *new(SyllableType)
 		}
 		Syllable.Units = append(Syllable.Units, unit)
 		if unit.Closing ||
-		((NextUnit.Type == "Punctuation" || NextUnit.Type == "Space") &&
-		!(unit.Type == "Punctuation" || unit.Type == "Space")) {
+		contains(IrrelevantTypes, NextUnit.Type) && 
+		!contains(IrrelevantTypes, unit.Type) {
 			Syllables = append(Syllables, Syllable)
 			Syllable = *new(SyllableType)
 		}
@@ -266,7 +272,7 @@ func main() {
 			if len(Syllable.Units) > i+1 {
 				NextUnit = Syllable.Units[i+1]
 			}
-			if (unit.Type == "Punctuation" || unit.Type == "Space" || unit.Type == "Other") {
+			if contains(IrrelevantTypes, unit.Type) {
 				Syllable.Irrelevant = true
 			}
 			if (unit.Type == "ShortVowel" &&
@@ -365,11 +371,8 @@ func main() {
 		if class != "" && wantHtml {
 			buf.WriteString("</span>")
 		}
-		// check: unless it appear as the last char in a row visually,
-		// if char is letter and  next char too, add separator
-		// FIXME <br> actually only occurs after a point/comma, fix or rm
+		//-----
 		if len(Syllables) > h+1 &&
-		Syllables[h+1].Units[0].Str != "<br>" &&
 		isLetterChar(Syllable.Units[len(Syllable.Units)-1].Type) &&
 		isLetterChar(Syllables[h+1].Units[0].Type) {
 			buf.WriteString(separator) 
@@ -381,7 +384,10 @@ func main() {
 	// maybe just discard buf for a modifiable string
 	outstr := buf.String()
 	for _, comment := range comments {
-		comment ="<span class=comment>" + comment[1:len(comment)-1] + "</span>"
+		if wantHtml {
+			comment = html.EscapeString(comment[1:len(comment)-1])
+			comment = "<span class=comment>" + comment + "</span>"
+		}
 		outstr = strings.Replace(outstr, "𓃰", comment, 1)
 	}
 	err := os.WriteFile(*out, []byte(outstr), 0644)
