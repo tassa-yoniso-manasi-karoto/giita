@@ -235,18 +235,14 @@ func main() {
 			// case SU-PA-ṬI-pan-no
 		if unit.Type == "ShortVowel" &&
 		!(NextUnit.Type == "Consonant" && NextNextUnit.Type == "Consonant") &&
-		!(NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ") &&
+		!(strings.ToLower(NextUnit.Str) == "ṁ") &&
 		!(contains(AspiratedConsonants, NextUnit.Str) && PrevUnit.Type != "Consonant") {
 			// case HO-mi
 		} else if unit.Type == "LongVowel" &&
 		!(NextUnit.Type == "Consonant" && NextNextUnit.Type == "Consonant") &&
-		!(NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ") {
-			// case SAM-mā
+		!(strings.ToLower(NextUnit.Str) == "ṁ") {
+			// case sag-GAṀ and also "2 consonant in a row" case
 		} else if unit.Type == "Consonant" &&
-		NextUnit.Type == "Consonant" &&
-		contains(VowelTypes, PrevUnit.Type) {
-			// case DHAM-mo
-		} else if contains(UnstoppingChar, strings.ToLower(unit.Str)) &&
 		!contains(VowelTypes, NextUnit.Type) &&
 		contains(VowelTypes, PrevUnit.Type) {
 		} else {
@@ -276,7 +272,7 @@ func main() {
 				Syllable.Irrelevant = true
 			}
 			if (unit.Type == "ShortVowel" &&
-			(NextUnit.Str == "ṁ" || NextUnit.Str == "Ṁ")) ||
+			strings.ToLower(NextUnit.Str) == "ṁ") ||
 			(unit.Type == "ShortVowel" && NextUnit.Type == "Consonant" && NextUnit.Closing) ||
 			(unit.Type == "LongVowel") {
 				Syllable.isLong = true
