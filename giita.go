@@ -16,19 +16,22 @@ import (
 // NOTE: makasa → "ma-kasa" = presumed to be an exception
 // var test string = "arahaṁ, abhivādemi, supaṭipanno, sambuddho, svākkhāto, tassa, metta, ahaṁ, homi, avero, dhammo, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
 
-// TODO flag to load the CSS from a file
+/* TODO
+	flag to load the CSS from a file
+	discard buf for a modifiable string
+*/
 
 const (
-	LongVowel = iota
-	ShortVowel
-	Consonant
+	LongVwl = iota
+	ShortVwl
+	Cons
 	Punct
 	Space
 	Other
 )
 
 var (
-	source string
+	src string
 	rePunc = regexp.MustCompile(`^\pP+`)
 	reIsNotExeptPunct = regexp.MustCompile(`^[^-“’„	"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
@@ -36,20 +39,20 @@ var (
 	newline = "<br>"
 
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
-	LongVowels = []string{"ā", "e", "ī", "o", "ū", "ay"}
-	ShortVowels = []string{"a", "i", "u"}
-	reLongVowels []*regexp.Regexp
-	reShortVowels []*regexp.Regexp
+	LongVwls = []string{"ā", "e", "ī", "o", "ū", "ay"}
+	ShortVwls = []string{"a", "i", "u"}
+	reLongVwls []*regexp.Regexp
+	reShortVwls []*regexp.Regexp
 
-	Consonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
-	reConsonants []*regexp.Regexp
+	Conss = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
+	reConss []*regexp.Regexp
 	
-	AspiratedConsonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
-	UnstoppingChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
+	AspiratedConss = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
+	UnstopChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
 	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported.
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
-	OptionalHighToneFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
-	VowelTypes = []int{LongVowel, ShortVowel}
+	OptHighFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
+	VowelTypes = []int{LongVwl, ShortVwl}
 	IrrelevantTypes = []int{Punct, Space, Other}
 
 	debug bool
@@ -167,52 +170,54 @@ func init() {
 	fmt.Println("Out:", *out)
 	dat, err := os.ReadFile(*in)
 	check(err)
-	source = string(dat)
+	src = string(dat)
 	//------
-	for _, ShortVowel := range ShortVowels {
-		re := regexp.MustCompile("(?i)^" + ShortVowel)
-		reShortVowels = append(reShortVowels, re)
+	for _, ShortVwl := range ShortVwls {
+		re := regexp.MustCompile("(?i)^" + ShortVwl)
+		reShortVwls = append(reShortVwls, re)
 	}
-	for _, LongVowel := range LongVowels {
-		re := regexp.MustCompile("(?i)^" + LongVowel)
-		reLongVowels = append(reLongVowels, re)
+	for _, LongVwl := range LongVwls {
+		re := regexp.MustCompile("(?i)^" + LongVwl)
+		reLongVwls = append(reLongVwls, re)
 	}
-	for _, Consonant := range Consonants {
-		re := regexp.MustCompile("(?i)^" + Consonant)
-		reConsonants = append(reConsonants, re)
+	for _, Cons := range Conss {
+		re := regexp.MustCompile("(?i)^" + Cons)
+		reConss = append(reConss, re)
 	}
 }
 
 
 func main() {
-	source = strings.ReplaceAll(source, "ṇ", "ṅ")
-	source = strings.ReplaceAll(source, "ṃ", "ṁ")
+	src = strings.ReplaceAll(src, "ṇ", "ṅ")
+	src = strings.ReplaceAll(src, "ṃ", "ṁ")
 	// chunks from long compound words need to be reunited or will be 
 	// treated as separate
-	source = strings.ReplaceAll(source, "-", "")
-	comments := reComment.FindAllString(source, -1)
-	source = reComment.ReplaceAllString(source, "𓃰")
+	src = strings.ReplaceAll(src, "-", "")
+	comments := reComment.FindAllString(src, -1)
+	src = reComment.ReplaceAllString(src, "𓃰")
 	
-	var UnitStack []UnitType
-	for source != "" {
+	var Units []UnitType
+	for src != "" {
 		notFound := true
-		if rePunc.MatchString(source) {
-			found := rePunc.FindString(source)
-			UnitStack = append(UnitStack, UnitType{Str: found, Type: Punct})
-			source = strings.TrimPrefix(source, found)
+		if rePunc.MatchString(src) {
+			found := rePunc.FindString(src)
+			Units = append(Units, UnitType{Str: found, Type: Punct})
+			src = strings.TrimPrefix(src, found)
 			notFound = false
-		} else if reSpace.MatchString(source) {
-			found := reSpace.FindString(source)
-			UnitStack = append(UnitStack, UnitType{Str: found, Type: Space})
-			source = strings.TrimPrefix(source, found)
+		} else if reSpace.MatchString(src) {
+			found := reSpace.FindString(src)
+			Units = append(Units, UnitType{Str: found, Type: Space})
+			src = strings.TrimPrefix(src, found)
 			notFound = false
 		}
-		for i, list := range [][]*regexp.Regexp{reLongVowels, reShortVowels, reConsonants} {
+		lists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reConss}
+		for i, list := range lists {
 			for _, re := range list {
-				if re.MatchString(source) {
-					found := re.FindString(source)
-					UnitStack = append(UnitStack, UnitType{Str: found, Type: i})
-					source = strings.TrimPrefix(source, found)
+				if re.MatchString(src) {
+					found := re.FindString(src)
+					Units = append(Units,
+					UnitType{Str: found, Type: i})
+					src = strings.TrimPrefix(src, found)
 					notFound = false
 					break
 				}
@@ -222,9 +227,9 @@ func main() {
 			}
 		}
 		if notFound {
-			char := strings.Split(source, "")[0]
-			UnitStack = append(UnitStack, UnitType{Str: char, Type: Other})
-			source = strings.TrimPrefix(source, char)
+			char := strings.Split(src, "")[0]
+			Units = append(Units, UnitType{Str: char, Type: Other})
+			src = strings.TrimPrefix(src, char)
 			if debug {
 				fmt.Printf("'%s' : Character unknown\n", char)
 			}
@@ -234,28 +239,28 @@ func main() {
 		Syllables []SyllableType
 		Syllable SyllableType
 	)
-	for i, unit := range UnitStack {
+	for i, unit := range Units {
 		var PrevUnit, NextUnit, NextNextUnit UnitType
-		if len(UnitStack) > i+2 {
-			NextNextUnit = UnitStack[i+2]
-			NextUnit = UnitStack[i+1]
+		if len(Units) > i+2 {
+			NextNextUnit = Units[i+2]
+			NextUnit = Units[i+1]
 		}
 		if i-1 >= 0 {
-			PrevUnit = UnitStack[i-1]
+			PrevUnit = Units[i-1]
 		}
 		//assume true, overwrite everything after setting exceptions
 		unit.Closing = true		
 			// case SU-PA-ṬI-pan-no
-		if unit.Type == ShortVowel &&
-		!(NextUnit.Type == Consonant && NextNextUnit.Type == Consonant) &&
+		if unit.Type == ShortVwl &&
+		!(NextUnit.Type == Cons && NextNextUnit.Type == Cons) &&
 		!(strings.ToLower(NextUnit.Str) == "ṁ") &&
-		!(contains(AspiratedConsonants, NextUnit.Str) && PrevUnit.Type != Consonant) {
+		!(contains(AspiratedConss,NextUnit.Str) && PrevUnit.Type!=Cons){
 			// case HO-mi
-		} else if unit.Type == LongVowel &&
-		!(NextUnit.Type == Consonant && NextNextUnit.Type == Consonant) &&
+		} else if unit.Type == LongVwl &&
+		!(NextUnit.Type == Cons && NextNextUnit.Type == Cons) &&
 		!(strings.ToLower(NextUnit.Str) == "ṁ") {
 			// case sag-GAṀ and also "2 consonants in a row" case
-		} else if unit.Type == Consonant &&
+		} else if unit.Type == Cons &&
 		!contains(VowelTypes, NextUnit.Type) &&
 		contains(VowelTypes, PrevUnit.Type) {
 		} else {
@@ -278,24 +283,25 @@ func main() {
 	for h, Syllable := range Syllables {
 		for i, unit := range Syllable.Units {
 			var NextUnit UnitType
+			firstUnit := strings.ToLower(Syllable.Units[0].Str)
 			if len(Syllable.Units) > i+1 {
 				NextUnit = Syllable.Units[i+1]
 			}
 			if contains(IrrelevantTypes, unit.Type) {
 				Syllable.Irrelevant = true
 			}
-			if (unit.Type == ShortVowel &&
+			if (unit.Type == ShortVwl &&
 			strings.ToLower(NextUnit.Str) == "ṁ") ||
-			(unit.Type == ShortVowel && NextUnit.Type == Consonant && NextUnit.Closing) ||
-			(unit.Type == LongVowel) {
+			(unit.Type == ShortVwl && NextUnit.Type == Cons &&
+			NextUnit.Closing) || (unit.Type == LongVwl) {
 				Syllable.isLong = true
 			}
-			if contains(UnstoppingChar, strings.ToLower(unit.Str)) &&
+			if contains(UnstopChar, strings.ToLower(unit.Str)) &&
 			unit.Closing ||
-			(unit.Type == LongVowel && unit.Closing) {
+			(unit.Type == LongVwl && unit.Closing) {
 				Syllable.NotStopped = true
 			}
-			if contains(HighToneFirstChar, strings.ToLower(Syllable.Units[0].Str)) {
+			if contains(HighToneFirstChar, firstUnit) {
 				Syllable.hasHighToneFirstChar = true
 			}
 			if Syllable.hasHighToneFirstChar &&
@@ -304,20 +310,24 @@ func main() {
 				Syllable.TrueHigh = true
 				if Syllable.TrueHigh && !wantHtml {
 					for k, unit := range Syllable.Units {
-						Syllable.Units[k].Str = strings.ToUpper(unit.Str)
+						s := strings.ToUpper(unit.Str)
+						Syllable.Units[k].Str = s
 					}
 				}
 			}
 			//---
-			if !Syllable.TrueHigh && unit.Type == ShortVowel &&
-			contains(OptionalHighToneFirstChar, strings.ToLower(Syllable.Units[0].Str)) {
+			if !Syllable.TrueHigh && unit.Type == ShortVwl &&
+			contains(OptHighFirstChar, firstUnit) {
 				if unit.Closing ||
-				!contains(UnstoppingChar, strings.ToLower(NextUnit.Str)) {
+				!contains(UnstopChar,
+				strings.ToLower(NextUnit.Str)) {
 					Syllable.OptionalHigh = true
 				}
-				if Syllable.OptionalHigh && !wantHtml && *wantOptionalHigh {
+				if Syllable.OptionalHigh && !wantHtml &&
+				*wantOptionalHigh {
 					for k, unit := range Syllable.Units {
-						Syllable.Units[k].Str = strings.ToUpper(unit.Str)
+						s := strings.ToUpper(unit.Str)
+						Syllable.Units[k].Str = s
 					}
 					
 				}
@@ -355,22 +365,26 @@ func main() {
 		}
 		for _, unit := range Syllable.Units {
 			if strings.Contains(unit.Str, "\n") {
-				unit.Str = strings.ReplaceAll(unit.Str, "\n", newline)
-				buf.WriteString(unit.Str)
+				s := strings.ReplaceAll(unit.Str, "\n", newline)
+				buf.WriteString(s)
 			} else if reSpace.MatchString(unit.Str) {
 				buf.WriteString(" ")
 				if wantHtml {
 					buf.WriteString("&nbsp;")
 				}
-			} else if rePunc.MatchString(unit.Str) && reIsNotExeptPunct.MatchString(unit.Str) {
+			} else if rePunc.MatchString(unit.Str) &&
+			reIsNotExeptPunct.MatchString(unit.Str) {
 				if wantHtml {
-					buf.WriteString(html.EscapeString(unit.Str) + "<span class=\"punct\"></span>")
+					buf.WriteString(
+					html.EscapeString(unit.Str) +
+					"<span class=punct></span>")
 				} else {
 					buf.WriteString(unit.Str + "█")
 				}
 			} else {
 				if wantHtml {
-					buf.WriteString(html.EscapeString(unit.Str))
+					s := html.EscapeString(unit.Str)
+					buf.WriteString(s)
 				} else {
 					buf.WriteString(unit.Str)
 				}
@@ -380,16 +394,19 @@ func main() {
 			buf.WriteString("</span>")
 		}
 		//-----
-		if len(Syllables) > h+1 &&
-		!contains(IrrelevantTypes, Syllable.Units[len(Syllable.Units)-1].Type) &&
-		!contains(IrrelevantTypes, Syllables[h+1].Units[0].Type) {
+		var lastUnit, firstNextUnit UnitType
+		if len(Syllables) > h+1 {
+			lastUnit = Syllable.Units[len(Syllable.Units)-1]
+			firstNextUnit = Syllables[h+1].Units[0]
+		}
+		if !contains(IrrelevantTypes, lastUnit.Type) &&
+		!contains(IrrelevantTypes, firstNextUnit.Type) {
 			buf.WriteString(separator) 
 		}
 	}
 	if wantHtml {
 		buf.WriteString("</body></html>")
 	}
-	// maybe just discard buf for a modifiable string
 	outstr := buf.String()
 	for _, comment := range comments {
 		if wantHtml {
