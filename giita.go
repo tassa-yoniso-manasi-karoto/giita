@@ -35,7 +35,7 @@ var (
 	rePunc = regexp.MustCompile(`^\pP+`)
 	reIsNotExeptPunct = regexp.MustCompile(`^[^-“’„	"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
-	reComment = regexp.MustCompile(`(?s)\[.*?\]`)
+	reCmt = regexp.MustCompile(`(?s)\[.*?\]`)
 	newline = "<br>"
 
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
@@ -191,8 +191,8 @@ func main() {
 	// chunks from long compound words need to be reunited or will be 
 	// treated as separate
 	src = strings.ReplaceAll(src, "-", "")
-	comments := reComment.FindAllString(src, -1)
-	src = reComment.ReplaceAllString(src, "𓃰")
+	cmts := reCmt.FindAllString(src, -1)
+	src = reCmt.ReplaceAllString(src, "𓃰")
 	
 	var Units []UnitType
 	for src != "" {
@@ -406,12 +406,12 @@ func main() {
 		buf.WriteString("</body></html>")
 	}
 	outstr := buf.String()
-	for _, comment := range comments {
+	for _, cmt := range cmts {
 		if wantHtml {
-			comment = html.EscapeString(comment[1:len(comment)-1])
-			comment = "<span class=comment>" + comment + "</span>"
+			cmt = html.EscapeString(cmt[1:len(cmt)-1])
+			cmt = "<span class=cmt>" + cmt + "</span>"
 		}
-		outstr = strings.Replace(outstr, "𓃰", comment, 1)
+		outstr = strings.Replace(outstr, "𓃰", cmt, 1)
 	}
 	err := os.WriteFile(*out, []byte(outstr), 0644)
 	check(err)
