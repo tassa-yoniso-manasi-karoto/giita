@@ -18,7 +18,6 @@ import (
 
 // TODO flag to load the CSS from a file
 
-
 const (
 	LongVowel = iota
 	ShortVowel
@@ -27,14 +26,6 @@ const (
 	Space
 	Other
 )
-
-const (
-	None = iota
-	TrueHigh
-	OptionalHigh
-	Low
-)
-
 
 var (
 	source string
