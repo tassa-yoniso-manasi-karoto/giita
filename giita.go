@@ -409,7 +409,7 @@ func main() {
 	for _, cmt := range cmts {
 		if wantHtml {
 			cmt = html.EscapeString(cmt[1:len(cmt)-1])
-			cmt = "<span class=cmt>" + cmt + "</span>"
+			cmt = "<span class=comment>" + cmt + "</span>"
 		}
 		outstr = strings.Replace(outstr, "𓃰", cmt, 1)
 	}
