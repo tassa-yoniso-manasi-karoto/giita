@@ -128,8 +128,6 @@ type SyllableType struct {
 	TrueHigh, OptionalHigh				bool
 }
 
-type HtmlClass string
-
 func init() {
 	e, err := os.Executable()
 	if err != nil {
