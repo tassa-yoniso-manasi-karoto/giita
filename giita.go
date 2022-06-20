@@ -44,10 +44,10 @@ var (
 	reLongVwls []*regexp.Regexp
 	reShortVwls []*regexp.Regexp
 
-	Conss = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
-	reConss []*regexp.Regexp
+	C = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
+	reC []*regexp.Regexp
 	
-	AspiratedConss = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
+	AspiratedC = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
 	UnstopChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
 	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported.
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
@@ -180,9 +180,9 @@ func init() {
 		re := regexp.MustCompile("(?i)^" + LongVwl)
 		reLongVwls = append(reLongVwls, re)
 	}
-	for _, Cons := range Conss {
+	for _, Cons := range C {
 		re := regexp.MustCompile("(?i)^" + Cons)
-		reConss = append(reConss, re)
+		reC = append(reC, re)
 	}
 }
 
@@ -210,7 +210,7 @@ func main() {
 			src = strings.TrimPrefix(src, found)
 			notFound = false
 		}
-		lists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reConss}
+		lists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC}
 		for i, list := range lists {
 			for _, re := range list {
 				if re.MatchString(src) {
@@ -254,7 +254,7 @@ func main() {
 		if unit.Type == ShortVwl &&
 		!(NextUnit.Type == Cons && NextNextUnit.Type == Cons) &&
 		!(strings.ToLower(NextUnit.Str) == "ṁ") &&
-		!(contains(AspiratedConss,NextUnit.Str) && PrevUnit.Type!=Cons){
+		!(contains(AspiratedC,NextUnit.Str) && PrevUnit.Type != Cons) {
 			// case HO-mi
 		} else if unit.Type == LongVwl &&
 		!(NextUnit.Type == Cons && NextNextUnit.Type == Cons) &&
