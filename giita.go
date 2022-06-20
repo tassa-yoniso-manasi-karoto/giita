@@ -13,14 +13,33 @@ import (
 )
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
+// NOTE: makasa → "ma-kasa" = presumed to be an exception
 // var test string = "arahaṁ, abhivādemi, supaṭipanno, sambuddho, svākkhāto, tassa, metta, ahaṁ, homi, avero, dhammo, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
 
 // TODO flag to load the CSS from a file
 
+
+const (
+	LongVowel = iota
+	ShortVowel
+	Consonant
+	Punct
+	Space
+	Other
+)
+
+const (
+	None = iota
+	TrueHigh
+	OptionalHigh
+	Low
+)
+
+
 var (
 	source string
 	rePunc = regexp.MustCompile(`^\pP+`)
-	reIsNotExeptPunc = regexp.MustCompile(`^[^-“’„	"\(\)\[\]«'‘‚-]+`)
+	reIsNotExeptPunct = regexp.MustCompile(`^[^-“’„	"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
 	reComment = regexp.MustCompile(`(?s)\[.*?\]`)
 	newline = "<br>"
@@ -28,7 +47,6 @@ var (
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
 	LongVowels = []string{"ā", "e", "ī", "o", "ū", "ay"}
 	ShortVowels = []string{"a", "i", "u"}
-	VowelTypes = []string{"ShortVowel", "LongVowel"}
 	reLongVowels []*regexp.Regexp
 	reShortVowels []*regexp.Regexp
 
@@ -37,10 +55,11 @@ var (
 	
 	AspiratedConsonants = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
 	UnstoppingChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
-	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported atm.
+	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported.
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptionalHighToneFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
-	IrrelevantTypes = []string{"Punctuation", "Space", "Other"}
+	VowelTypes = []int{LongVowel, ShortVowel}
+	IrrelevantTypes = []int{Punct, Space, Other}
 
 	debug bool
 	CurrentDir, refCmt string
@@ -104,7 +123,7 @@ body {
 
 type UnitType struct {
 	Str     string
-	Type    string
+	Type    int
 	Len     string
 	Closing bool
 }
@@ -115,6 +134,8 @@ type SyllableType struct {
 	TrueHigh, OptionalHigh				bool
 }
 
+type HtmlClass string
+
 func init() {
 	e, err := os.Executable()
 	if err != nil {
@@ -122,14 +143,15 @@ func init() {
 	} else {
 		CurrentDir = path.Dir(e)
 	}
+	// STRING
 	in = flag.String("i", CurrentDir + "/input.txt", "path of input UTF-8 encoded text file\n")
 	out = flag.String("o", CurrentDir + "/output.htm", "path of output file\n")
 	refCmt = *flag.String("c", "[:]", "allow comments in input file and specify which characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
-	//---
+	// BOOL
 	wantTxt = flag.Bool("t", false , "use raw text instead of HTML for the output file (on with -t=true)")
 	wantOptionalHigh = flag.Bool("optionalhigh", false , "requires -t, it formats optional high tones with capital letters\njust like true high tones (on with -optionalhigh=true)")
 	wantDark = flag.Bool("d", false , "dark mode, will use a white font on a dark background (on with -d=true)")
-	//---
+	// INT
 	wantNewlineNum = flag.Int("l", 1 , "set how many linebreaks will be created from a single linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
 	wantFontSize = flag.Int("f", 34 , "set font size")
 	flag.Parse()
@@ -185,12 +207,12 @@ func main() {
 		notFound := true
 		if rePunc.MatchString(source) {
 			found := rePunc.FindString(source)
-			UnitStack = append(UnitStack, UnitType{Str: found, Type: "Punctuation"})
+			UnitStack = append(UnitStack, UnitType{Str: found, Type: Punct})
 			source = strings.TrimPrefix(source, found)
 			notFound = false
 		} else if reSpace.MatchString(source) {
 			found := reSpace.FindString(source)
-			UnitStack = append(UnitStack, UnitType{Str: found, Type: "Space"})
+			UnitStack = append(UnitStack, UnitType{Str: found, Type: Space})
 			source = strings.TrimPrefix(source, found)
 			notFound = false
 		}
@@ -198,7 +220,7 @@ func main() {
 			for _, re := range list {
 				if re.MatchString(source) {
 					found := re.FindString(source)
-					UnitStack = append(UnitStack, UnitType{Str: found, Type: whichList(i)})
+					UnitStack = append(UnitStack, UnitType{Str: found, Type: i})
 					source = strings.TrimPrefix(source, found)
 					notFound = false
 					break
@@ -210,7 +232,7 @@ func main() {
 		}
 		if notFound {
 			char := strings.Split(source, "")[0]
-			UnitStack = append(UnitStack, UnitType{Str: char, Type: "Other"})
+			UnitStack = append(UnitStack, UnitType{Str: char, Type: Other})
 			source = strings.TrimPrefix(source, char)
 			if debug {
 				fmt.Printf("'%s' : Character unknown\n", char)
@@ -233,16 +255,16 @@ func main() {
 		//assume true, overwrite everything after setting exceptions
 		unit.Closing = true		
 			// case SU-PA-ṬI-pan-no
-		if unit.Type == "ShortVowel" &&
-		!(NextUnit.Type == "Consonant" && NextNextUnit.Type == "Consonant") &&
+		if unit.Type == ShortVowel &&
+		!(NextUnit.Type == Consonant && NextNextUnit.Type == Consonant) &&
 		!(strings.ToLower(NextUnit.Str) == "ṁ") &&
-		!(contains(AspiratedConsonants, NextUnit.Str) && PrevUnit.Type != "Consonant") {
+		!(contains(AspiratedConsonants, NextUnit.Str) && PrevUnit.Type != Consonant) {
 			// case HO-mi
-		} else if unit.Type == "LongVowel" &&
-		!(NextUnit.Type == "Consonant" && NextNextUnit.Type == "Consonant") &&
+		} else if unit.Type == LongVowel &&
+		!(NextUnit.Type == Consonant && NextNextUnit.Type == Consonant) &&
 		!(strings.ToLower(NextUnit.Str) == "ṁ") {
-			// case sag-GAṀ and also "2 consonant in a row" case
-		} else if unit.Type == "Consonant" &&
+			// case sag-GAṀ and also "2 consonants in a row" case
+		} else if unit.Type == Consonant &&
 		!contains(VowelTypes, NextUnit.Type) &&
 		contains(VowelTypes, PrevUnit.Type) {
 		} else {
@@ -271,15 +293,15 @@ func main() {
 			if contains(IrrelevantTypes, unit.Type) {
 				Syllable.Irrelevant = true
 			}
-			if (unit.Type == "ShortVowel" &&
+			if (unit.Type == ShortVowel &&
 			strings.ToLower(NextUnit.Str) == "ṁ") ||
-			(unit.Type == "ShortVowel" && NextUnit.Type == "Consonant" && NextUnit.Closing) ||
-			(unit.Type == "LongVowel") {
+			(unit.Type == ShortVowel && NextUnit.Type == Consonant && NextUnit.Closing) ||
+			(unit.Type == LongVowel) {
 				Syllable.isLong = true
 			}
 			if contains(UnstoppingChar, strings.ToLower(unit.Str)) &&
 			unit.Closing ||
-			(unit.Type == "LongVowel" && unit.Closing) {
+			(unit.Type == LongVowel && unit.Closing) {
 				Syllable.NotStopped = true
 			}
 			if contains(HighToneFirstChar, strings.ToLower(Syllable.Units[0].Str)) {
@@ -296,7 +318,7 @@ func main() {
 				}
 			}
 			//---
-			if !Syllable.TrueHigh && unit.Type == "ShortVowel" &&
+			if !Syllable.TrueHigh && unit.Type == ShortVowel &&
 			contains(OptionalHighToneFirstChar, strings.ToLower(Syllable.Units[0].Str)) {
 				if unit.Closing ||
 				!contains(UnstoppingChar, strings.ToLower(NextUnit.Str)) {
@@ -309,7 +331,6 @@ func main() {
 					
 				}
 			}
-			//---
 			Syllables[h] = Syllable
 		}
 	}
@@ -330,8 +351,8 @@ func main() {
 		}
 		
 		class := ""
-		if Syllable.whichTone() != "none" {
-			class += Syllable.whichTone()
+		if t := Syllable.whichTone(); t != "none" {
+			class += t
 		}
 		if Syllable.isLong {
 			class = appendClass(class, "long")
@@ -350,7 +371,7 @@ func main() {
 				if wantHtml {
 					buf.WriteString("&nbsp;")
 				}
-			} else if rePunc.MatchString(unit.Str) && reIsNotExeptPunc.MatchString(unit.Str) {
+			} else if rePunc.MatchString(unit.Str) && reIsNotExeptPunct.MatchString(unit.Str) {
 				if wantHtml {
 					buf.WriteString(html.EscapeString(unit.Str) + "<span class=\"punct\"></span>")
 				} else {
@@ -369,8 +390,8 @@ func main() {
 		}
 		//-----
 		if len(Syllables) > h+1 &&
-		isLetterChar(Syllable.Units[len(Syllable.Units)-1].Type) &&
-		isLetterChar(Syllables[h+1].Units[0].Type) {
+		!contains(IrrelevantTypes, Syllable.Units[len(Syllable.Units)-1].Type) &&
+		!contains(IrrelevantTypes, Syllables[h+1].Units[0].Type) {
 			buf.WriteString(separator) 
 		}
 	}
@@ -391,7 +412,6 @@ func main() {
 	fmt.Println("Done")
 }
 
-
 func appendClass(class, s string) string {
 	if class != "" {
 		class += " "
@@ -400,27 +420,6 @@ func appendClass(class, s string) string {
 	return class
 }
 
-func isLetterChar(s string) bool {
-	b := true
-	if s == "Punctuation" {
-		b = false
-	} else if s == "Space" {
-		b = false
-	}
-	return b
-}
-
-func whichList(i int) string {
-	switch i {
-	case 0:
-		return "LongVowel"
-	case 1:
-		return "ShortVowel"
-	case 2:
-		return "Consonant"
-	}
-	return ""
-}
 
 func (Syllable *SyllableType) whichTone() string {
 	switch {
@@ -433,9 +432,9 @@ func (Syllable *SyllableType) whichTone() string {
 	return "none"
 }
 
-func contains(arr []string, str string) bool {
+func contains[T comparable] (arr []T, i T) bool {
 	for _, a := range arr {
-		if a == str {
+		if a == i {
 			return true
 		}
 	}
@@ -448,12 +447,11 @@ func check(e error) {
     }
 }
 
-func isFlagPassed(name string) bool {
-    found := false
+func isFlagPassed(name string) (found bool) {
     flag.Visit(func(f *flag.Flag) {
         if f.Name == name {
             found = true
         }
     })
-    return found
+    return
 }
