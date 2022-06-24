@@ -33,7 +33,7 @@ const (
 var (
 	src string
 	rePunc = regexp.MustCompile(`^\pP+`)
-	reIsNotExeptPunct = regexp.MustCompile(`^[^-“’„	"\(\)\[\]«'‘‚-]+`)
+	reIsNotExceptPunct = regexp.MustCompile(`^[^-“’„"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
 	reCmt = regexp.MustCompile(`(?s)\[.*?\]`)
 	newline = "<br>"
@@ -47,8 +47,8 @@ var (
 	C = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
 	reC []*regexp.Regexp
 	
-	AspiratedC = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh"}
-	UnstopChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "r", "y"}
+	NeverLastPos = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "v", "r"}
+	UnstopChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "y"} 
 	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported.
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptHighFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
@@ -129,6 +129,22 @@ type SyllableType struct {
 }
 
 func init() {
+	for _, ShortVwl := range ShortVwls {
+		re := regexp.MustCompile("(?i)^" + ShortVwl)
+		reShortVwls = append(reShortVwls, re)
+	}
+	for _, LongVwl := range LongVwls {
+		re := regexp.MustCompile("(?i)^" + LongVwl)
+		reLongVwls = append(reLongVwls, re)
+	}
+	for _, Cons := range C {
+		re := regexp.MustCompile("(?i)^" + Cons)
+		reC = append(reC, re)
+	}
+}
+
+
+func main() {
 	e, err := os.Executable()
 	if err != nil {
 		fmt.Println(err)
@@ -169,23 +185,6 @@ func init() {
 	dat, err := os.ReadFile(*in)
 	check(err)
 	src = string(dat)
-	//------
-	for _, ShortVwl := range ShortVwls {
-		re := regexp.MustCompile("(?i)^" + ShortVwl)
-		reShortVwls = append(reShortVwls, re)
-	}
-	for _, LongVwl := range LongVwls {
-		re := regexp.MustCompile("(?i)^" + LongVwl)
-		reLongVwls = append(reLongVwls, re)
-	}
-	for _, Cons := range C {
-		re := regexp.MustCompile("(?i)^" + Cons)
-		reC = append(reC, re)
-	}
-}
-
-
-func main() {
 	src = strings.ReplaceAll(src, "ṇ", "ṅ")
 	src = strings.ReplaceAll(src, "ṃ", "ṁ")
 	// chunks from long compound words need to be reunited or will be 
@@ -193,29 +192,37 @@ func main() {
 	src = strings.ReplaceAll(src, "-", "")
 	cmts := reCmt.FindAllString(src, -1)
 	src = reCmt.ReplaceAllString(src, "𓃰")
-	
-	var Units []UnitType
+	// As a consequence of putting the 2 caracters consonants/vowels at
+	// the beginning of the the reference consonant/vowels arrays, this 
+	// parser performs a blind greedy matching. 
+	// There is however one exception where this isn't desired:
+	// the "ay" long vowel versus a "a" short vowel followed by a "y"
+	// consonant. This script tries to distinguishes the two by assessing 
+	// if a "ay" would result in a syllable inbalance in the next syllable.
+	var RawUnits []UnitType
 	for src != "" {
 		notFound := true
 		if rePunc.MatchString(src) {
-			found := rePunc.FindString(src)
-			Units = append(Units, UnitType{Str: found, Type: Punct})
-			src = strings.TrimPrefix(src, found)
+			m := rePunc.FindString(src)
+			u := UnitType{Str: m, Type: Punct}
+			RawUnits = append(RawUnits, u)
+			src = strings.TrimPrefix(src, m)
 			notFound = false
 		} else if reSpace.MatchString(src) {
-			found := reSpace.FindString(src)
-			Units = append(Units, UnitType{Str: found, Type: Space})
-			src = strings.TrimPrefix(src, found)
+			m := reSpace.FindString(src)
+			u := UnitType{Str: m, Type: Space}
+			RawUnits = append(RawUnits, u)
+			src = strings.TrimPrefix(src, m)
 			notFound = false
 		}
 		lists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC}
 		for i, list := range lists {
 			for _, re := range list {
 				if re.MatchString(src) {
-					found := re.FindString(src)
-					Units = append(Units,
-					UnitType{Str: found, Type: i})
-					src = strings.TrimPrefix(src, found)
+					m := re.FindString(src)
+					RawUnits = append(RawUnits,
+					UnitType{Str: m, Type: i})
+					src = strings.TrimPrefix(src, m)
 					notFound = false
 					break
 				}
@@ -226,58 +233,55 @@ func main() {
 		}
 		if notFound {
 			char := strings.Split(src, "")[0]
-			Units = append(Units, UnitType{Str: char, Type: Other})
+			RawUnits = append(RawUnits, UnitType{Str: char, Type: Other})
 			src = strings.TrimPrefix(src, char)
 			if debug {
 				fmt.Printf("'%s' : Character unknown\n", char)
 			}
 		}
 	}
-	var (
-		Syllables []SyllableType
-		Syllable SyllableType
-	)
-	for i, unit := range Units {
-		var PrevUnit, NextUnit, NextNextUnit UnitType
-		if len(Units) > i+2 {
-			NextNextUnit = Units[i+2]
-			NextUnit = Units[i+1]
+	// here is the (ugly) "ay" fix
+	Syllables := SyllableBuilder(RawUnits)
+	RawUnits = []UnitType{}
+	SkipNext := false
+	for h, Syllable := range Syllables {
+		if SkipNext {
+			SkipNext = false
+			continue
 		}
-		if i-1 >= 0 {
-			PrevUnit = Units[i-1]
-		}
-		//assume true, overwrite everything after setting exceptions
-		unit.Closing = true		
-			// case SU-PA-ṬI-pan-no
-		if unit.Type == ShortVwl &&
-		!(NextUnit.Type == Cons && NextNextUnit.Type == Cons) &&
-		!(strings.ToLower(NextUnit.Str) == "ṁ") &&
-		!(contains(AspiratedC,NextUnit.Str) && PrevUnit.Type != Cons) {
-			// case HO-mi
-		} else if unit.Type == LongVwl &&
-		!(NextUnit.Type == Cons && NextNextUnit.Type == Cons) &&
-		!(strings.ToLower(NextUnit.Str) == "ṁ") {
-			// case sag-GAṀ and also "2 consonants in a row" case
-		} else if unit.Type == Cons &&
-		!contains(VowelTypes, NextUnit.Type) &&
-		contains(VowelTypes, PrevUnit.Type) {
-		} else {
-			unit.Closing = false
-		}
-		//----
-		if contains(IrrelevantTypes, PrevUnit.Type) &&
-		!contains(IrrelevantTypes, unit.Type) {
-			Syllables = append(Syllables, Syllable)
-			Syllable = *new(SyllableType)
-		}
-		Syllable.Units = append(Syllable.Units, unit)
-		if unit.Closing ||
-		contains(IrrelevantTypes, NextUnit.Type) && 
-		!contains(IrrelevantTypes, unit.Type) {
-			Syllables = append(Syllables, Syllable)
-			Syllable = *new(SyllableType)
+		for _, unit := range Syllable.Units {
+			var (
+				ok bool
+				NextSyl SyllableType
+			)
+			if unit.Str != "ay" {
+				ok = true
+			} else if h+1 > len(Syllables) {
+				ok = true
+			} else {
+				NextSyl = Syllables[h+1]				
+				VwlNum, ConsNum := NextSyl.Describe()
+				if VwlNum == 1 && ConsNum == 0 {						
+				} else if VwlNum == 2 {
+				} else {
+					ok = true
+				}
+			}
+			if !ok {
+				unit.Str = "a"
+				y := []UnitType{UnitType{Str: "y", Type: Cons}}
+				nxtRpl := append(y, NextSyl.Units...)
+				rpl := append([]UnitType{unit}, nxtRpl...)
+				RawUnits = append(RawUnits, rpl...)
+				SkipNext = true
+			} else {
+				RawUnits = append(RawUnits, unit)
+			}
 		}
 	}
+	// units have been correct, just rebuild from scratch
+	Syllables = SyllableBuilder(RawUnits)
+	//------------------
 	for h, Syllable := range Syllables {
 		for i, unit := range Syllable.Units {
 			var NextUnit UnitType
@@ -371,7 +375,7 @@ func main() {
 					buf.WriteString("&nbsp;")
 				}
 			} else if rePunc.MatchString(unit.Str) &&
-			reIsNotExeptPunct.MatchString(unit.Str) {
+			reIsNotExceptPunct.MatchString(unit.Str) {
 				if wantHtml {
 					buf.WriteString(
 					html.EscapeString(unit.Str) +
@@ -413,7 +417,7 @@ func main() {
 		}
 		outstr = strings.Replace(outstr, "𓃰", cmt, 1)
 	}
-	err := os.WriteFile(*out, []byte(outstr), 0644)
+	err = os.WriteFile(*out, []byte(outstr), 0644)
 	check(err)
 	fmt.Println("Done")
 }
@@ -427,6 +431,69 @@ func appendClass(class, s string) string {
 }
 
 
+func SyllableBuilder(Units []UnitType) (Syllables []SyllableType) {
+	var Syllable SyllableType
+	for i, unit := range Units {
+		var (
+			PrevUnit, NextUnit, NextNextUnit UnitType
+			notBeforeTwoCons bool
+		)
+		if i+2 < len(Units){
+			NextNextUnit = Units[i+2]
+		} else {
+			notBeforeTwoCons = true
+		}
+		if i+1 < len(Units){
+			NextUnit = Units[i+1]
+		}
+		if i-1 >= 0 {
+			PrevUnit = Units[i-1]
+		}
+		if !(NextUnit.Type == Cons && NextNextUnit.Type == Cons) {
+			notBeforeTwoCons = true
+		}
+		//assume true, overwrite everything after setting exceptions
+		unit.Closing = true		
+			// case no further input
+		if i+1 == len(Units) {
+			// case SU-PA-ṬI-pan-no
+		} else if unit.Type == ShortVwl && notBeforeTwoCons &&
+		!(strings.ToLower(NextUnit.Str) == "ṁ") &&
+		!(contains(NeverLastPos,NextUnit.Str) &&
+		!contains(VowelTypes, NextNextUnit.Type)) {
+			// case HO-mi
+		} else if unit.Type == LongVwl && notBeforeTwoCons &&
+		!(strings.ToLower(NextUnit.Str) == "ṁ") {
+			// case sag-GAṀ and also "2 consonants in a row" case
+		} else if unit.Type == Cons &&
+		!contains(VowelTypes, NextUnit.Type) &&
+		contains(VowelTypes, PrevUnit.Type) {
+		} else {
+			unit.Closing = false
+		}		
+		//----
+		if contains(IrrelevantTypes, PrevUnit.Type) &&
+		!contains(IrrelevantTypes, unit.Type) {
+			Syllables = append(Syllables, Syllable)
+			Syllable = *new(SyllableType)
+		}
+		Syllable.Units = append(Syllable.Units, unit)
+		if unit.Closing ||
+		contains(IrrelevantTypes, NextUnit.Type) && 
+		!contains(IrrelevantTypes, unit.Type) {
+			Syllables = append(Syllables, Syllable)
+			Syllable = *new(SyllableType)
+		}
+	}
+	if len(Syllable.Units) != 0 {
+		if debug {
+			fmt.Println("len(Syllable.Units) != 0, APPENDING....")
+		}
+		Syllables = append(Syllables, Syllable)
+	}
+	return
+}
+
 func (Syllable *SyllableType) whichTone() string {
 	switch {
 	case Syllable.TrueHigh:
@@ -436,6 +503,19 @@ func (Syllable *SyllableType) whichTone() string {
 	default:
 	}
 	return "none"
+}
+
+
+func (Syllable *SyllableType) Describe() (VwlNum int, ConsNum int) {
+	for _, unit := range Syllable.Units {
+		switch {
+		case contains(VowelTypes, unit.Type):
+			VwlNum += 1
+		case unit.Type == Cons:
+			ConsNum += 1
+		}				
+	}
+	return 
 }
 
 func contains[T comparable] (arr []T, i T) bool {
