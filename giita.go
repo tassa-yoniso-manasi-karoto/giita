@@ -240,8 +240,8 @@ func main() {
 			}
 		}
 	}
-	// here is the (ugly) "ay" fix
 	Syllables := SyllableBuilder(RawUnits)
+	// here is the (ugly) "ay" fix
 	RawUnits = []UnitType{}
 	SkipNext := false
 	for h, Syllable := range Syllables {
@@ -254,7 +254,7 @@ func main() {
 				ok bool
 				NextSyl SyllableType
 			)
-			if unit.Str != "ay" {
+			if strings.ToLower(unit.Str) != "ay" {
 				ok = true
 			} else if h+1 > len(Syllables) {
 				ok = true
@@ -268,7 +268,8 @@ func main() {
 				}
 			}
 			if !ok {
-				unit.Str = "a"
+				// preserves capital letter if there is one
+				unit.Str = unit.Str[:1]
 				y := []UnitType{UnitType{Str: "y", Type: Cons}}
 				nxtRpl := append(y, NextSyl.Units...)
 				rpl := append([]UnitType{unit}, nxtRpl...)
@@ -279,7 +280,7 @@ func main() {
 			}
 		}
 	}
-	// units have been correct, just rebuild from scratch
+	// units have been corrected, just rebuild from scratch
 	Syllables = SyllableBuilder(RawUnits)
 	//------------------
 	for h, Syllable := range Syllables {
