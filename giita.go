@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"flag"
 	"html"
+	"unicode/utf8"
 )
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -55,7 +56,7 @@ var (
 	VowelTypes = []int{LongVwl, ShortVwl}
 	IrrelevantTypes = []int{Punct, Space, Other}
 
-	debug bool
+	debug *bool
 	CurrentDir string
 	in, out, refCmt *string
 	wantNewlineNum, wantFontSize *int
@@ -159,6 +160,7 @@ func main() {
 	wantTxt = flag.Bool("t", false , "use raw text instead of HTML for the output file (on with -t=true)")
 	wantOptionalHigh = flag.Bool("optionalhigh", false , "requires -t, it formats optional high tones with capital letters\njust like true high tones (on with -optionalhigh=true)")
 	wantDark = flag.Bool("d", false , "dark mode, will use a white font on a dark background (on with -d=true)")
+	debug = flag.Bool("debug", false , "")
 	// INT
 	wantNewlineNum = flag.Int("l", 1 , "set how many linebreaks will be created from a single linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
 	wantFontSize = flag.Int("f", 34 , "set font size")
@@ -192,12 +194,12 @@ func main() {
 	src = strings.ReplaceAll(src, "-", "")
 	cmts := reCmt.FindAllString(src, -1)
 	src = reCmt.ReplaceAllString(src, "𓃰")
-	// As a consequence of putting the 2 caracters consonants/vowels at
+	// As a consequence of putting the 2 characters consonants/vowels at
 	// the beginning of the the reference consonant/vowels arrays, this 
 	// parser performs a blind greedy matching. 
 	// There is however one exception where this isn't desired:
 	// the "ay" long vowel versus a "a" short vowel followed by a "y"
-	// consonant. This script tries to distinguishes the two by assessing 
+	// consonant. This script tries to distinguish the two by assessing 
 	// if a "ay" would result in a syllable inbalance in the next syllable.
 	var RawUnits []UnitType
 	for src != "" {
@@ -220,8 +222,8 @@ func main() {
 			for _, re := range list {
 				if re.MatchString(src) {
 					m := re.FindString(src)
-					RawUnits = append(RawUnits,
-					UnitType{Str: m, Type: i})
+					u := UnitType{Str: m, Type: i}
+					RawUnits = append(RawUnits, u)
 					src = strings.TrimPrefix(src, m)
 					notFound = false
 					break
@@ -233,10 +235,13 @@ func main() {
 		}
 		if notFound {
 			char := strings.Split(src, "")[0]
-			RawUnits = append(RawUnits, UnitType{Str: char, Type: Other})
+			u := UnitType{Str: char, Type: Other}
+			RawUnits = append(RawUnits, u)
 			src = strings.TrimPrefix(src, char)
-			if debug {
-				fmt.Printf("'%s' : Character unknown\n", char)
+			if *debug {
+				r, _ := utf8.DecodeRuneInString(char)
+				fmt.Printf("'%s': Char unknown (%U)\n",
+				char, r)
 			}
 		}
 	}
@@ -487,7 +492,7 @@ func SyllableBuilder(Units []UnitType) (Syllables []SyllableType) {
 		}
 	}
 	if len(Syllable.Units) != 0 {
-		if debug {
+		if *debug {
 			fmt.Println("len(Syllable.Units) != 0, APPENDING....")
 		}
 		Syllables = append(Syllables, Syllable)
