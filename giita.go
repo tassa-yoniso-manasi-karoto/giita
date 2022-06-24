@@ -56,8 +56,8 @@ var (
 	IrrelevantTypes = []int{Punct, Space, Other}
 
 	debug bool
-	CurrentDir, refCmt string
-	in, out *string
+	CurrentDir string
+	in, out, refCmt *string
 	wantNewlineNum, wantFontSize *int
 	wantTxt, wantOptionalHigh, wantDark *bool
 	wantHtml = true
@@ -154,7 +154,7 @@ func main() {
 	// STRING
 	in = flag.String("i", CurrentDir + "/input.txt", "path of input UTF-8 encoded text file\n")
 	out = flag.String("o", CurrentDir + "/output.htm", "path of output file\n")
-	refCmt = *flag.String("c", "[:]", "allow comments in input file and specify which characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
+	refCmt = flag.String("c", "[:]", "allow comments in input file and specify which characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
 	// BOOL
 	wantTxt = flag.Bool("t", false , "use raw text instead of HTML for the output file (on with -t=true)")
 	wantOptionalHigh = flag.Bool("optionalhigh", false , "requires -t, it formats optional high tones with capital letters\njust like true high tones (on with -optionalhigh=true)")
@@ -163,10 +163,10 @@ func main() {
 	wantNewlineNum = flag.Int("l", 1 , "set how many linebreaks will be created from a single linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
 	wantFontSize = flag.Int("f", 34 , "set font size")
 	flag.Parse()
-	if len(refCmt) != 3 {
+	if len(*refCmt) != 3 {
 		panic("You provided an invalid input of comment marks.")
 	}
-	page = fmt.Sprintf(page, *wantFontSize, refCmt[0:1], refCmt[2:3])
+	page = fmt.Sprintf(page, *wantFontSize, (*refCmt)[0:1], (*refCmt)[2:3])
 	if *wantTxt {
 		wantHtml = false
 		newline = "\n"
