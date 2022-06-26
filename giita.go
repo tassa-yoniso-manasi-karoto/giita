@@ -1,5 +1,6 @@
 // ☸
-package main
+
+package giita
 
 import (
 	"fmt"
@@ -17,9 +18,14 @@ import (
 // NOTE: makasa → "ma-kasa" = presumed to be an exception
 // var test string = "arahaṁ, abhivādemi, supaṭipanno, sambuddho, svākkhāto, tassa, metta, ahaṁ, homi, avero, dhammo, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
 
-/* TODO
+/*
+TODO
 	flag to load the CSS from a file
+	make test files
 	discard buf for a modifiable string
+COULD
+	diff against ↓ to find exceptions (all long falling tones?): METta, viMOKkha, sometime also pāṭiMOKkhe
+	https://www.dhammatalks.org/books/ChantingGuide/Section0000.html,
 */
 
 const (
@@ -37,7 +43,8 @@ var (
 	reIsNotExceptPunct = regexp.MustCompile(`^[^-“’„"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
 	reCmt = regexp.MustCompile(`(?s)\[.*?\]`)
-	newline = "<br>"
+	// the \n makes the html source somewhat readable
+	newline = "<br>\n"
 
 	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
 	LongVwls = []string{"ā", "e", "ī", "o", "ū", "ay"}
@@ -50,7 +57,6 @@ var (
 	
 	NeverLastPos = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "v", "r"}
 	UnstopChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "y"} 
-	// EXCEPTION: "mok" in Pāṭimokkha takes a high tone: not supported.
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptHighFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 	VowelTypes = []int{LongVwl, ShortVwl}
@@ -124,7 +130,7 @@ type UnitType struct {
 }
 type SyllableType struct {
 	Units                               		[]UnitType
-	isLong, NotStopped, hasHighToneFirstChar	bool
+	IsLong, NotStopped, HasHighToneFirstChar	bool
 	Irrelevant					bool
 	TrueHigh, OptionalHigh				bool
 }
@@ -188,20 +194,145 @@ func main() {
 	check(err)
 	src = string(dat)
 	src = strings.ReplaceAll(src, "ṇ", "ṅ")
+	src = strings.ReplaceAll(src, "Ṇ", "Ṅ")
 	src = strings.ReplaceAll(src, "ṃ", "ṁ")
-	// chunks from long compound words need to be reunited or will be 
-	// treated as separate
+	src = strings.ReplaceAll(src, "Ṃ", "Ṁ")
+	// chunks from long compound words need to be reunited or will be treated as separate
 	src = strings.ReplaceAll(src, "-", "")
 	cmts := reCmt.FindAllString(src, -1)
 	src = reCmt.ReplaceAllString(src, "𓃰")
 	// As a consequence of putting the 2 characters consonants/vowels at
-	// the beginning of the the reference consonant/vowels arrays, this 
+	// the beginning of the the reference consonants/vowels arrays, this 
 	// parser performs a blind greedy matching. 
 	// There is however one exception where this isn't desired:
-	// the "ay" long vowel versus a "a" short vowel followed by a "y"
-	// consonant. This script tries to distinguish the two by assessing 
-	// if a "ay" would result in a syllable inbalance in the next syllable.
-	var RawUnits []UnitType
+	// the "ay" long vowel versus a "a" short vowel followed by a "y" consonant. 
+	// This script tries to distinguish the two by assessing if a "ay" would 
+	// result in a syllable inbalance in the next syllable.
+	RawUnits := Parser(src)
+	Syllables := SyllableBuilder(RawUnits)
+	RawUnits = []UnitType{}
+	SkipNext := false
+	for h, Syllable := range Syllables {
+		if SkipNext {
+			SkipNext = false
+			continue
+		}
+		for _, unit := range Syllable.Units {
+			var (
+				ok bool
+				NextSyl SyllableType
+			)
+			if strings.ToLower(unit.Str) != "ay" {
+				ok = true
+			} else if h+1 > len(Syllables) {
+				ok = true
+			} else {
+				NextSyl = Syllables[h+1]				
+				VwlNum, ConsNum := NextSyl.Describe()
+				if VwlNum == 1 && ConsNum == 0 {						
+				} else if VwlNum == 2 {
+				} else {
+					ok = true
+				}
+			}
+			if !ok {
+				// preserves the capital letter if there is one
+				y := []UnitType{UnitType{Str: unit.Str[1:2], Type: Cons}}
+				unit = UnitType{Str: unit.Str[:1], Type: ShortVwl}
+				nxtRpl := append(y, NextSyl.Units...)
+				rpl := append([]UnitType{unit}, nxtRpl...)
+				RawUnits = append(RawUnits, rpl...)
+				SkipNext = true
+			} else {
+				RawUnits = append(RawUnits, unit)
+			}
+		}
+	}
+	// units have been corrected, just rebuild from scratch
+	Syllables = SyllableBuilder(RawUnits)
+	//------------------
+	Syllables = SetTones(Syllables)
+	buf := bytes.NewBufferString(page)
+	separator := "⸱"
+	span := "<span class=\"%s\">"
+	if wantHtml {
+		separator = "<span class=s></span>"
+	}
+	openword := false
+	for h, Syllable := range Syllables {
+		if wantHtml && !Syllable.Irrelevant && !openword {
+			fmt.Fprintf(buf, span, "w")
+			openword = true
+		} else if wantHtml && Syllable.Irrelevant && openword {
+			buf.WriteString("</span>")
+			openword = false
+		}		
+		class := ""
+		if t := Syllable.whichTone(); t != "" {
+			class += t
+		}
+		if Syllable.IsLong {
+			class = appendClass(class, "long")
+		} else if !Syllable.Irrelevant {
+			class = appendClass(class, "short")
+		}	
+		if class != "" && wantHtml {
+			fmt.Fprintf(buf, span, class)
+		}
+		for _, unit := range Syllable.Units {
+			if strings.Contains(unit.Str, "\n") {
+				buf.WriteString(strings.ReplaceAll(unit.Str, "\n", newline))
+			} else if reSpace.MatchString(unit.Str) {
+				buf.WriteString(" ")
+				if wantHtml {
+					buf.WriteString("&nbsp;")
+				}
+			} else if rePunc.MatchString(unit.Str) && reIsNotExceptPunct.MatchString(unit.Str) {
+				if wantHtml {
+					buf.WriteString(html.EscapeString(unit.Str) + "<span class=punct></span>")
+				} else {
+					buf.WriteString(unit.Str + "█")
+				}
+			} else {
+				if wantHtml {
+					buf.WriteString(html.EscapeString(unit.Str))
+				} else {
+					buf.WriteString(unit.Str)
+				}
+			}
+		}
+		if class != "" && wantHtml {
+			buf.WriteString("</span>")
+		}
+		//-----
+		var lastUnit, firstNextSylUnit UnitType
+		if len(Syllables) > h+1 {
+			lastUnit = Syllable.Units[len(Syllable.Units)-1]
+			firstNextSylUnit = Syllables[h+1].Units[0]
+		}
+		if !contains(IrrelevantTypes, lastUnit.Type) &&
+		!contains(IrrelevantTypes, firstNextSylUnit.Type) {
+			buf.WriteString(separator) 
+		}
+	}
+	if wantHtml {
+		buf.WriteString("</body></html>")
+	}
+	outstr := buf.String()
+	for _, cmt := range cmts {
+		if wantHtml {
+			cmt = html.EscapeString(cmt[1:len(cmt)-1])
+			cmt = "<span class=comment>" + cmt + "</span>"
+		}
+		outstr = strings.Replace(outstr, "𓃰", cmt, 1)
+	}
+	err = os.WriteFile(*out, []byte(outstr), 0644)
+	check(err)
+	fmt.Println("Done")
+}
+
+
+func Parser(src string) (RawUnits []UnitType) {
 	for src != "" {
 		notFound := true
 		if rePunc.MatchString(src) {
@@ -240,202 +371,12 @@ func main() {
 			src = strings.TrimPrefix(src, char)
 			if *debug {
 				r, _ := utf8.DecodeRuneInString(char)
-				fmt.Printf("'%s': Char unknown (%U)\n",
-				char, r)
+				fmt.Printf("'%s': Char unknown (%U)\n",	char, r)
 			}
 		}
 	}
-	Syllables := SyllableBuilder(RawUnits)
-	// here is the (ugly) "ay" fix
-	RawUnits = []UnitType{}
-	SkipNext := false
-	for h, Syllable := range Syllables {
-		if SkipNext {
-			SkipNext = false
-			continue
-		}
-		for _, unit := range Syllable.Units {
-			var (
-				ok bool
-				NextSyl SyllableType
-			)
-			if strings.ToLower(unit.Str) != "ay" {
-				ok = true
-			} else if h+1 > len(Syllables) {
-				ok = true
-			} else {
-				NextSyl = Syllables[h+1]				
-				VwlNum, ConsNum := NextSyl.Describe()
-				if VwlNum == 1 && ConsNum == 0 {						
-				} else if VwlNum == 2 {
-				} else {
-					ok = true
-				}
-			}
-			if !ok {
-				// preserves capital letter if there is one
-				unit.Str = unit.Str[:1]
-				y := []UnitType{UnitType{Str: "y", Type: Cons}}
-				nxtRpl := append(y, NextSyl.Units...)
-				rpl := append([]UnitType{unit}, nxtRpl...)
-				RawUnits = append(RawUnits, rpl...)
-				SkipNext = true
-			} else {
-				RawUnits = append(RawUnits, unit)
-			}
-		}
-	}
-	// units have been corrected, just rebuild from scratch
-	Syllables = SyllableBuilder(RawUnits)
-	//------------------
-	for h, Syllable := range Syllables {
-		for i, unit := range Syllable.Units {
-			var NextUnit UnitType
-			firstUnit := strings.ToLower(Syllable.Units[0].Str)
-			if len(Syllable.Units) > i+1 {
-				NextUnit = Syllable.Units[i+1]
-			}
-			if contains(IrrelevantTypes, unit.Type) {
-				Syllable.Irrelevant = true
-			}
-			if (unit.Type == ShortVwl &&
-			strings.ToLower(NextUnit.Str) == "ṁ") ||
-			(unit.Type == ShortVwl && NextUnit.Type == Cons &&
-			NextUnit.Closing) || (unit.Type == LongVwl) {
-				Syllable.isLong = true
-			}
-			if contains(UnstopChar, strings.ToLower(unit.Str)) &&
-			unit.Closing ||
-			(unit.Type == LongVwl && unit.Closing) {
-				Syllable.NotStopped = true
-			}
-			if contains(HighToneFirstChar, firstUnit) {
-				Syllable.hasHighToneFirstChar = true
-			}
-			if Syllable.hasHighToneFirstChar &&
-			Syllable.NotStopped &&
-			Syllable.isLong {
-				Syllable.TrueHigh = true
-				if Syllable.TrueHigh && !wantHtml {
-					for k, unit := range Syllable.Units {
-						s := strings.ToUpper(unit.Str)
-						Syllable.Units[k].Str = s
-					}
-				}
-			}
-			//---
-			if !Syllable.TrueHigh && unit.Type == ShortVwl &&
-			contains(OptHighFirstChar, firstUnit) {
-				if unit.Closing ||
-				!contains(UnstopChar,
-				strings.ToLower(NextUnit.Str)) {
-					Syllable.OptionalHigh = true
-				}
-				if Syllable.OptionalHigh && !wantHtml &&
-				*wantOptionalHigh {
-					for k, unit := range Syllable.Units {
-						s := strings.ToUpper(unit.Str)
-						Syllable.Units[k].Str = s
-					}
-					
-				}
-			}
-			Syllables[h] = Syllable
-		}
-	}
-	buf := bytes.NewBufferString(page)
-	separator := "⸱"
-	span := "<span class=\"%s\">"
-	if wantHtml {
-		separator = "<span class=s></span>"
-	}
-	openword := false
-	for h, Syllable := range Syllables {
-		if wantHtml && !Syllable.Irrelevant && !openword {
-			fmt.Fprintf(buf, span, "w")
-			openword = true
-		} else if wantHtml && Syllable.Irrelevant && openword {
-			buf.WriteString("</span>")
-			openword = false
-		}
-		
-		class := ""
-		if t := Syllable.whichTone(); t != "none" {
-			class += t
-		}
-		if Syllable.isLong {
-			class = appendClass(class, "long")
-		} else if !Syllable.Irrelevant {
-			class = appendClass(class, "short")
-		}	
-		if class != "" && wantHtml {
-			fmt.Fprintf(buf, span, class)
-		}
-		for _, unit := range Syllable.Units {
-			if strings.Contains(unit.Str, "\n") {
-				s := strings.ReplaceAll(unit.Str, "\n", newline)
-				buf.WriteString(s)
-			} else if reSpace.MatchString(unit.Str) {
-				buf.WriteString(" ")
-				if wantHtml {
-					buf.WriteString("&nbsp;")
-				}
-			} else if rePunc.MatchString(unit.Str) &&
-			reIsNotExceptPunct.MatchString(unit.Str) {
-				if wantHtml {
-					buf.WriteString(
-					html.EscapeString(unit.Str) +
-					"<span class=punct></span>")
-				} else {
-					buf.WriteString(unit.Str + "█")
-				}
-			} else {
-				if wantHtml {
-					s := html.EscapeString(unit.Str)
-					buf.WriteString(s)
-				} else {
-					buf.WriteString(unit.Str)
-				}
-			}
-		}
-		if class != "" && wantHtml {
-			buf.WriteString("</span>")
-		}
-		//-----
-		var lastUnit, firstNextUnit UnitType
-		if len(Syllables) > h+1 {
-			lastUnit = Syllable.Units[len(Syllable.Units)-1]
-			firstNextUnit = Syllables[h+1].Units[0]
-		}
-		if !contains(IrrelevantTypes, lastUnit.Type) &&
-		!contains(IrrelevantTypes, firstNextUnit.Type) {
-			buf.WriteString(separator) 
-		}
-	}
-	if wantHtml {
-		buf.WriteString("</body></html>")
-	}
-	outstr := buf.String()
-	for _, cmt := range cmts {
-		if wantHtml {
-			cmt = html.EscapeString(cmt[1:len(cmt)-1])
-			cmt = "<span class=comment>" + cmt + "</span>"
-		}
-		outstr = strings.Replace(outstr, "𓃰", cmt, 1)
-	}
-	err = os.WriteFile(*out, []byte(outstr), 0644)
-	check(err)
-	fmt.Println("Done")
+	return
 }
-
-func appendClass(class, s string) string {
-	if class != "" {
-		class += " "
-	}
-	class += s
-	return class
-}
-
 
 func SyllableBuilder(Units []UnitType) (Syllables []SyllableType) {
 	var Syllable SyllableType
@@ -465,8 +406,7 @@ func SyllableBuilder(Units []UnitType) (Syllables []SyllableType) {
 			// case SU-PA-ṬI-pan-no
 		} else if unit.Type == ShortVwl && notBeforeTwoCons &&
 		!(strings.ToLower(NextUnit.Str) == "ṁ") &&
-		!(contains(NeverLastPos,NextUnit.Str) &&
-		!contains(VowelTypes, NextNextUnit.Type)) {
+		!(contains(NeverLastPos,NextUnit.Str) && !contains(VowelTypes, NextNextUnit.Type)) {
 			// case HO-mi
 		} else if unit.Type == LongVwl && notBeforeTwoCons &&
 		!(strings.ToLower(NextUnit.Str) == "ṁ") {
@@ -500,6 +440,66 @@ func SyllableBuilder(Units []UnitType) (Syllables []SyllableType) {
 	return
 }
 
+func SetTones(Syllables []SyllableType) []SyllableType {
+	for h, Syllable := range Syllables {
+		for i, unit := range Syllable.Units {
+			var NextUnit UnitType
+			firstUnit := strings.ToLower(Syllable.Units[0].Str)
+			if len(Syllable.Units) > i+1 {
+				NextUnit = Syllable.Units[i+1]
+			}
+			if contains(IrrelevantTypes, unit.Type) {
+				Syllable.Irrelevant = true
+			}
+			if (unit.Type == ShortVwl && strings.ToLower(NextUnit.Str) == "ṁ") ||
+			(unit.Type == ShortVwl && NextUnit.Type == Cons && NextUnit.Closing) ||
+			(unit.Type == LongVwl) {
+				Syllable.IsLong = true
+			}
+			if contains(UnstopChar, strings.ToLower(unit.Str)) && unit.Closing ||
+			(unit.Type == LongVwl && unit.Closing) {
+				Syllable.NotStopped = true
+			}
+			if contains(HighToneFirstChar, firstUnit) {
+				Syllable.HasHighToneFirstChar = true
+			}
+			if Syllable.HasHighToneFirstChar &&  Syllable.NotStopped && Syllable.IsLong {
+				Syllable.TrueHigh = true
+				if Syllable.TrueHigh && !wantHtml {
+					for k, unit := range Syllable.Units {
+						s := strings.ToUpper(unit.Str)
+						Syllable.Units[k].Str = s
+					}
+				}
+			}
+			//---
+			if !Syllable.TrueHigh && unit.Type == ShortVwl && contains(OptHighFirstChar, firstUnit) {
+				if unit.Closing || !contains(UnstopChar, strings.ToLower(NextUnit.Str)) {
+					Syllable.OptionalHigh = true
+				}
+				if Syllable.OptionalHigh && !wantHtml && *wantOptionalHigh {
+					for k, unit := range Syllable.Units {
+						s := strings.ToUpper(unit.Str)
+						Syllable.Units[k].Str = s
+					}
+					
+				}
+			}
+			Syllables[h] = Syllable
+		}
+	}
+	return Syllables
+}
+
+
+func appendClass(class, s string) string {
+	if class != "" {
+		class += " "
+	}
+	class += s
+	return class
+}
+
 func (Syllable *SyllableType) whichTone() string {
 	switch {
 	case Syllable.TrueHigh:
@@ -508,7 +508,7 @@ func (Syllable *SyllableType) whichTone() string {
 		return "optionalhigh"
 	default:
 	}
-	return "none"
+	return ""
 }
 
 

@@ -1,6 +1,6 @@
 CLI tool to format latin script Pali for chanting in the Thai style.
 
-This script was written with the Makhot style of the Dhammayut order (ธรรมยุติกนิกาย) in mind but its output can also be used for the Saṁyok style of the Maha Nikaya order.
+This script was written with the Makhot style of the Dhammayut order in mind but its output can also be used for the Saṁyok style of the Maha Nikaya order.
 This script implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
@@ -15,6 +15,11 @@ This script implements the tone rules provided at https://www.dhammatalks.org/eb
 - this script is provided here "for posterity" and will not be actively maintained
 - To chant in the Saṁyok style, uncomment  "/\*font-weight: 300;\*/" in the embedded CSS to create a visual difference between long and short syllables.
 - keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting is not always accurate!
+
+### Known issues
+- ambiguous cases "ay" cases like "viheṭhayanto" where it could referer either to the "ay" long vowel or an "a" followed by a "y"
+- brāhma* words.
+- nh* exceptions: nhārū, nhāyeyya
 
 ### Usage of giita:
 	-c string
