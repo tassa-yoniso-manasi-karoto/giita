@@ -1,6 +1,6 @@
 // ☸
 
-package giita
+package main
 
 import (
 	"fmt"
