@@ -43,12 +43,14 @@ var (
 	reIsNotExceptPunct = regexp.MustCompile(`^[^-“’„"\(\)\[\]«'‘‚-]+`)
 	reSpace = regexp.MustCompile(`(?s)^\s+`)
 	reCmt = regexp.MustCompile(`(?s)\[.*?\]`)
+	IrrelevantTypes = []int{Punct, Space, Other}
 	// the \n makes the html source somewhat readable
 	newline = "<br>\n"
 
-	Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
+	//Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
 	LongVwls = []string{"ā", "e", "ī", "o", "ū", "ay"}
 	ShortVwls = []string{"a", "i", "u"}
+	VowelTypes = []int{LongVwl, ShortVwl}
 	reLongVwls []*regexp.Regexp
 	reShortVwls []*regexp.Regexp
 
@@ -59,8 +61,6 @@ var (
 	UnstopChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "y"} 
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptHighFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
-	VowelTypes = []int{LongVwl, ShortVwl}
-	IrrelevantTypes = []int{Punct, Space, Other}
 
 	debug *bool
 	CurrentDir string
@@ -184,7 +184,7 @@ func main() {
 		}
 	} else if *wantDark {
 		page = strings.Replace(page, "body {", "body {\n  background: black;\n  color: white;", 1)
-		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";", ".s::before{\n  content: \"⸱\";\n  color: darkgrey;", 1)
+		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";", ".s::before{\n  content: \"⸱\";\n  color: #858585;", 1)
 		page = strings.Replace(page, ".comment {\n  background: lightgrey;", ".comment {\n  background: darkgrey;", 1)
 	}
 	newline = strings.Repeat(newline, *wantNewlineNum)
@@ -193,8 +193,6 @@ func main() {
 	dat, err := os.ReadFile(*in)
 	check(err)
 	src = string(dat)
-	src = strings.ReplaceAll(src, "ṇ", "ṅ")
-	src = strings.ReplaceAll(src, "Ṇ", "Ṅ")
 	src = strings.ReplaceAll(src, "ṃ", "ṁ")
 	src = strings.ReplaceAll(src, "Ṃ", "Ṁ")
 	// chunks from long compound words need to be reunited or will be treated as separate
@@ -207,7 +205,7 @@ func main() {
 	// There is however one exception where this isn't desired:
 	// the "ay" long vowel versus a "a" short vowel followed by a "y" consonant. 
 	// This script tries to distinguish the two by assessing if a "ay" would 
-	// result in a syllable inbalance in the next syllable.
+	// result in a syllable imbalance in the next syllable.
 	RawUnits := Parser(src)
 	Syllables := SyllableBuilder(RawUnits)
 	RawUnits = []UnitType{}
@@ -237,9 +235,9 @@ func main() {
 			}
 			if !ok {
 				// preserves the capital letter if there is one
-				y := []UnitType{UnitType{Str: unit.Str[1:2], Type: Cons}}
+				y := UnitType{Str: unit.Str[1:2], Type: Cons}
 				unit = UnitType{Str: unit.Str[:1], Type: ShortVwl}
-				nxtRpl := append(y, NextSyl.Units...)
+				nxtRpl := append([]UnitType{y}, NextSyl.Units...)
 				rpl := append([]UnitType{unit}, nxtRpl...)
 				RawUnits = append(RawUnits, rpl...)
 				SkipNext = true
@@ -250,7 +248,7 @@ func main() {
 	}
 	// units have been corrected, just rebuild from scratch
 	Syllables = SyllableBuilder(RawUnits)
-	//------------------
+	//---------
 	Syllables = SetTones(Syllables)
 	buf := bytes.NewBufferString(page)
 	separator := "⸱"
@@ -260,24 +258,26 @@ func main() {
 	}
 	openword := false
 	for h, Syllable := range Syllables {
-		if wantHtml && !Syllable.Irrelevant && !openword {
-			fmt.Fprintf(buf, span, "w")
-			openword = true
-		} else if wantHtml && Syllable.Irrelevant && openword {
-			buf.WriteString("</span>")
-			openword = false
-		}		
 		class := ""
-		if t := Syllable.whichTone(); t != "" {
-			class += t
-		}
-		if Syllable.IsLong {
-			class = appendClass(class, "long")
-		} else if !Syllable.Irrelevant {
-			class = appendClass(class, "short")
-		}	
-		if class != "" && wantHtml {
-			fmt.Fprintf(buf, span, class)
+		if wantHtml {
+			if !Syllable.Irrelevant && !openword {
+				fmt.Fprintf(buf, span, "w")
+				openword = true
+			} else if Syllable.Irrelevant && openword {
+				buf.WriteString("</span>")
+				openword = false
+			}
+			if t := Syllable.whichTone(); t != "" {
+				class += t
+			}
+			if Syllable.IsLong {
+				class = appendClass(class, "long")
+			} else if !Syllable.Irrelevant {
+				class = appendClass(class, "short")
+			}	
+			if class != "" {
+				fmt.Fprintf(buf, span, class)
+			}
 		}
 		for _, unit := range Syllable.Units {
 			if strings.Contains(unit.Str, "\n") {
@@ -305,14 +305,13 @@ func main() {
 			buf.WriteString("</span>")
 		}
 		//-----
-		var lastUnit, firstNextSylUnit UnitType
 		if len(Syllables) > h+1 {
-			lastUnit = Syllable.Units[len(Syllable.Units)-1]
-			firstNextSylUnit = Syllables[h+1].Units[0]
-		}
-		if !contains(IrrelevantTypes, lastUnit.Type) &&
-		!contains(IrrelevantTypes, firstNextSylUnit.Type) {
-			buf.WriteString(separator) 
+			lastUnit := Syllable.Units[len(Syllable.Units)-1]
+			NextSylFirstUnit := Syllables[h+1].Units[0]
+			if !contains(IrrelevantTypes, lastUnit.Type) &&
+			!contains(IrrelevantTypes, NextSylFirstUnit.Type) {
+				buf.WriteString(separator) 
+			}
 		}
 	}
 	if wantHtml {
@@ -369,7 +368,7 @@ func Parser(src string) (RawUnits []UnitType) {
 			u := UnitType{Str: char, Type: Other}
 			RawUnits = append(RawUnits, u)
 			src = strings.TrimPrefix(src, char)
-			if *debug {
+			if *debug && char != "𓃰" {
 				r, _ := utf8.DecodeRuneInString(char)
 				fmt.Printf("'%s': Char unknown (%U)\n",	char, r)
 			}
