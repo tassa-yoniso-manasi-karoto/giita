@@ -38,36 +38,36 @@ const (
 )
 
 var (
-	src string
-	rePunc = regexp.MustCompile(`^\pP+`)
+	src                string
+	rePunc             = regexp.MustCompile(`^\pP+`)
 	reIsNotExceptPunct = regexp.MustCompile(`^[^-“’„"\(\)\[\]«'‘‚-]+`)
-	reSpace = regexp.MustCompile(`(?s)^\s+`)
-	reCmt = regexp.MustCompile(`(?s)\[.*?\]`)
-	IrrelevantTypes = []int{Punct, Space, Other}
+	reSpace            = regexp.MustCompile(`(?s)^\s+`)
+	reCmt              = regexp.MustCompile(`(?s)\[.*?\]`)
+	IrrelevantTypes    = []int{Punct, Space, Other}
 	// the \n makes the html source somewhat readable
 	newline = "<br>\n"
 
 	//Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
-	LongVwls = []string{"ā", "e", "ī", "o", "ū", "ay"}
-	ShortVwls = []string{"a", "i", "u"}
-	VowelTypes = []int{LongVwl, ShortVwl}
-	reLongVwls []*regexp.Regexp
+	LongVwls    = []string{"ā", "e", "ī", "o", "ū", "ay"}
+	ShortVwls   = []string{"a", "i", "u"}
+	VowelTypes  = []int{LongVwl, ShortVwl}
+	reLongVwls  []*regexp.Regexp
 	reShortVwls []*regexp.Regexp
 
-	C = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
+	C   = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
 	reC []*regexp.Regexp
-	
-	NeverLastPos = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "v", "r"}
-	UnstopChar = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "y"} 
-	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
-	OptHighFirstChar = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 
-	debug *bool
-	CurrentDir string
-	in, out, refCmt *string
-	wantNewlineNum, wantFontSize *int
+	NeverLastPos      = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "v", "r"}
+	UnstopChar        = []string{"n", "ñ", "ṅ", "ṇ", "m", "ṁ", "ṃ", "l", "ḷ", "y"}
+	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
+	OptHighFirstChar  = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
+
+	debug                               *bool
+	CurrentDir                          string
+	in, out, refCmt                     *string
+	wantNewlineNum, wantFontSize        *int
 	wantTxt, wantOptionalHigh, wantDark *bool
-	wantHtml = true
+	wantHtml                            = true
 	page = `<!DOCTYPE html> <html><head>
 <meta charset="UTF-8">
 <style>
@@ -129,10 +129,10 @@ type UnitType struct {
 	Closing bool
 }
 type SyllableType struct {
-	Units                               		[]UnitType
-	IsLong, NotStopped, HasHighToneFirstChar	bool
-	Irrelevant					bool
-	TrueHigh, OptionalHigh				bool
+	Units                                    []UnitType
+	IsLong, NotStopped, HasHighToneFirstChar bool
+	Irrelevant                               bool
+	TrueHigh, OptionalHigh                   bool
 }
 
 func init() {
@@ -267,9 +267,7 @@ func main() {
 				buf.WriteString("</span>")
 				openword = false
 			}
-			if t := Syllable.whichTone(); t != "" {
-				class += t
-			}
+			class += Syllable.whichTone()
 			if Syllable.IsLong {
 				class = appendClass(class, "long")
 			} else if !Syllable.Irrelevant {
@@ -332,42 +330,29 @@ func main() {
 
 
 func Parser(src string) (RawUnits []UnitType) {
+	f := func(m string, src *string, i int) (u UnitType) {
+		u = UnitType{Str: m, Type: i}
+		*src = strings.TrimPrefix(*src, m)
+		return
+	}
+	lists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC, []*regexp.Regexp{rePunc}, []*regexp.Regexp{reSpace}}
 	for src != "" {
-		notFound := true
-		if rePunc.MatchString(src) {
-			m := rePunc.FindString(src)
-			u := UnitType{Str: m, Type: Punct}
-			RawUnits = append(RawUnits, u)
-			src = strings.TrimPrefix(src, m)
-			notFound = false
-		} else if reSpace.MatchString(src) {
-			m := reSpace.FindString(src)
-			u := UnitType{Str: m, Type: Space}
-			RawUnits = append(RawUnits, u)
-			src = strings.TrimPrefix(src, m)
-			notFound = false
-		}
-		lists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC}
+		found := false
 		for i, list := range lists {
 			for _, re := range list {
-				if re.MatchString(src) {
+				if found = re.MatchString(src); found {	
 					m := re.FindString(src)
-					u := UnitType{Str: m, Type: i}
-					RawUnits = append(RawUnits, u)
-					src = strings.TrimPrefix(src, m)
-					notFound = false
+					RawUnits = append(RawUnits, f(m, &src, i))
 					break
 				}
 			}
-			if !notFound {
+			if found {
 				break
 			}
 		}
-		if notFound {
+		if !found {
 			char := strings.Split(src, "")[0]
-			u := UnitType{Str: char, Type: Other}
-			RawUnits = append(RawUnits, u)
-			src = strings.TrimPrefix(src, char)
+			RawUnits = append(RawUnits, f(char, &src, Other))
 			if *debug && char != "𓃰" {
 				r, _ := utf8.DecodeRuneInString(char)
 				fmt.Printf("'%s': Char unknown (%U)\n",	char, r)
