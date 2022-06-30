@@ -12,6 +12,7 @@ import (
 	"flag"
 	"html"
 	"unicode/utf8"
+	"runtime"
 )
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -38,14 +39,11 @@ const (
 )
 
 var (
-	src                string
 	rePunc             = regexp.MustCompile(`^\pP+`)
 	reIsNotExceptPunct = regexp.MustCompile(`^[^-“’„"\(\)\[\]«'‘‚-]+`)
 	reSpace            = regexp.MustCompile(`(?s)^\s+`)
 	reCmt              = regexp.MustCompile(`(?s)\[.*?\]`)
 	IrrelevantTypes    = []int{Punct, Space, Other}
-	// the \n makes the html source somewhat readable
-	newline = "<br>\n"
 
 	//Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
 	LongVwls    = []string{"ā", "e", "ī", "o", "ū", "ay"}
@@ -175,6 +173,8 @@ func main() {
 		panic("You provided an invalid input of comment marks.")
 	}
 	page = fmt.Sprintf(page, *wantFontSize, (*refCmt)[0:1], (*refCmt)[2:3])
+	// the \n makes the html source somewhat readable
+	newline := "<br>\n"
 	if *wantTxt {
 		wantHtml = false
 		newline = "\n"
@@ -192,13 +192,23 @@ func main() {
 	fmt.Println("Out:", *out)
 	dat, err := os.ReadFile(*in)
 	check(err)
-	src = string(dat)
+	src := string(dat)
 	src = strings.ReplaceAll(src, "ṃ", "ṁ")
 	src = strings.ReplaceAll(src, "Ṃ", "Ṁ")
 	// chunks from long compound words need to be reunited or will be treated as separate
 	src = strings.ReplaceAll(src, "-", "")
 	cmts := reCmt.FindAllString(src, -1)
 	src = reCmt.ReplaceAllString(src, "𓃰")
+	if strings.Contains(src, "...") {
+		if runtime.GOOS != "windows" {
+			fmt.Print("\033[38;5;208m")
+		}
+		fmt.Printf("The input contains %d occurence(s) of '...' which usually indicates an ellipsis of a repeated formula. This could result in an incomplete chanting text.", strings.Count(src, "..."))
+		if runtime.GOOS != "windows" {
+			fmt.Print("\033[0m")
+		}
+		fmt.Print("\n")
+	}
 	// As a consequence of putting the 2 characters consonants/vowels at
 	// the beginning of the the reference consonants/vowels arrays, this 
 	// parser performs a blind greedy matching. 
