@@ -45,7 +45,7 @@ var (
 	reCmt              = regexp.MustCompile(`(?s)\[.*?\]`)
 	IrrelevantTypes    = []int{Punct, Space, Other}
 
-	//Vowels = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
+	//Vowels    = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
 	LongVwls    = []string{"ā", "e", "ī", "o", "ū", "ay"}
 	ShortVwls   = []string{"a", "i", "u"}
 	VowelTypes  = []int{LongVwl, ShortVwl}
@@ -61,7 +61,7 @@ var (
 	OptHighFirstChar  = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 
 	debug                               *bool
-	CurrentDir                          string
+	CurrentDir, ANSIOrange, ANSIReset   string
 	in, out, refCmt                     *string
 	wantNewlineNum, wantFontSize        *int
 	wantTxt, wantOptionalHigh, wantDark *bool
@@ -156,17 +156,24 @@ func main() {
 	} else {
 		CurrentDir = path.Dir(e)
 	}
+	if runtime.GOOS != "windows" {
+		ANSIOrange, ANSIReset = "\033[38;5;208m", "\033[0m"
+	}
 	// STRING
 	in = flag.String("i", CurrentDir + "/input.txt", "path of input UTF-8 encoded text file\n")
 	out = flag.String("o", CurrentDir + "/output.htm", "path of output file\n")
-	refCmt = flag.String("c", "[:]", "allow comments in input file and specify which characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
+	refCmt = flag.String("c", "[:]", "allow comments in input file and specify which " +
+		"characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
 	// BOOL
 	wantTxt = flag.Bool("t", false , "use raw text instead of HTML for the output file (on with -t=true)")
-	wantOptionalHigh = flag.Bool("optionalhigh", false , "requires -t, it formats optional high tones with capital letters\njust like true high tones (on with -optionalhigh=true)")
+	wantOptionalHigh = flag.Bool(
+		"optionalhigh", false , "requires -t, it formats optional " +
+		"high tones with capital letters\njust like true high tones (on with -optionalhigh=true)")
 	wantDark = flag.Bool("d", false , "dark mode, will use a white font on a dark background (on with -d=true)")
 	debug = flag.Bool("debug", false , "")
 	// INT
-	wantNewlineNum = flag.Int("l", 1 , "set how many linebreaks will be created from a single linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
+	wantNewlineNum = flag.Int("l", 1 , "set how many linebreaks will be created from a single " +
+		"linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
 	wantFontSize = flag.Int("f", 34 , "set font size")
 	flag.Parse()
 	if len(*refCmt) != 3 {
@@ -200,14 +207,10 @@ func main() {
 	cmts := reCmt.FindAllString(src, -1)
 	src = reCmt.ReplaceAllString(src, "𓃰")
 	if strings.Contains(src, "...") {
-		if runtime.GOOS != "windows" {
-			fmt.Print("\033[38;5;208m")
-		}
-		fmt.Printf("The input contains %d occurence(s) of '...' which usually indicates an ellipsis of a repeated formula. This could result in an incomplete chanting text.", strings.Count(src, "..."))
-		if runtime.GOOS != "windows" {
-			fmt.Print("\033[0m")
-		}
-		fmt.Print("\n")
+		fmt.Printf("%sThe input contains %d occurence(s) of '...' which " +
+		"usually indicates an ellipsis of a repeated formula. " +
+		"This could result in an incomplete chanting text.%s\n",
+		 ANSIOrange, strings.Count(src, "..."), ANSIReset)
 	}
 	// As a consequence of putting the 2 characters consonants/vowels at
 	// the beginning of the the reference consonants/vowels arrays, this 
