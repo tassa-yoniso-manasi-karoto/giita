@@ -27,6 +27,10 @@ TODO
 COULD
 	diff against ↓ to find exceptions (all long falling tones?): METta, viMOKkha, sometime also pāṭiMOKkhe
 	https://www.dhammatalks.org/books/ChantingGuide/Section0000.html,
+	use something like /digitalpalireader/_dprhtml/js/analysis_function.js to
+		(1) improve accuracy of syllable splitting;
+		(2) be able to split really long compound words like "cīvarapiṇḍapātasenāsanagilānappaccayabhesajjaparikkhārānan"
+		(would require a Go rewrite)
 */
 
 const (
@@ -182,8 +186,10 @@ func main() {
 	page = fmt.Sprintf(page, *wantFontSize, (*refCmt)[0:1], (*refCmt)[2:3])
 	// the \n makes the html source somewhat readable
 	newline := "<br>\n"
+	separator := "<span class=s></span>"
 	if *wantTxt {
 		wantHtml = false
+		separator = "⸱"
 		newline = "\n"
 		page = ""
 		if !isFlagPassed("o") {
@@ -264,11 +270,7 @@ func main() {
 	//---------
 	Syllables = SetTones(Syllables)
 	buf := bytes.NewBufferString(page)
-	separator := "⸱"
 	span := "<span class=\"%s\">"
-	if wantHtml {
-		separator = "<span class=s></span>"
-	}
 	openword := false
 	for h, Syllable := range Syllables {
 		class := ""
@@ -316,7 +318,7 @@ func main() {
 			buf.WriteString("</span>")
 		}
 		//-----
-		if len(Syllables) > h+1 {
+		if h+1 < len(Syllables) {
 			lastUnit := Syllable.Units[len(Syllable.Units)-1]
 			NextSylFirstUnit := Syllables[h+1].Units[0]
 			if !contains(IrrelevantTypes, lastUnit.Type) &&
