@@ -17,7 +17,7 @@ This script implements the tone rules provided at https://www.dhammatalks.org/eb
 - keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting is not always accurate!
 
 ### Known issues
-- ambiguous cases "ay" cases like "viheṭhayanto" where it could referer either to the "ay" long vowel or an "a" followed by a "y"
+- ambiguous "ay" cases like "viheṭhayanto" where it could referer either to the "ay" long vowel or an "a" followed by a "y"
 - \*brāhma\* words.
 - nh* exceptions: nhārū, nhāyeyya
 
