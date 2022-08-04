@@ -18,30 +18,39 @@ This script implements the tone rules provided at https://www.dhammatalks.org/eb
 
 ### Known issues
 - ambiguous cases "ay" cases like "viheṭhayanto" where it could referer either to the "ay" long vowel or an "a" followed by a "y"
-- brāhma* words.
+- \*brāhma\* words.
 - nh* exceptions: nhārū, nhāyeyya
 
 ### Usage of giita:
-	-c string
+        -c string
     	allow comments in input file and specify which characters marks
     	respectively the beginning and the end of a comment, separated
     	by a colon
-	-d	dark mode, will use a white font on a dark background (on with -d=true)
-	-f int
+        -css string
+    	will overwrite all CSS and CSS-related options with the CSS file at
+    	this path.
+        -d	dark mode, will use a white font on a dark background
+        -f int
     	set font size (default 34)
-	-i string
+        -hint
+    	suggests hints on where to catch one's breath in long compound words.
+    	(disable with -hint=false) (default true)
+        -i string
     	path of input UTF-8 encoded text file
     	 (default: "input.txt" in directory of executable)
-	-l int
+        -l int
     	set how many linebreaks will be created from a single linebreak in
     	the input file. Advisable to use 2 for smartphone/tablet/e-reader.
     	 (default 1)
-	-o string
+        -o string
     	path of output file
     	 (default: "output.htm" in directory of executable)
-	-optionalhigh
+        -optionalhigh
     	requires -t, it formats optional high tones with capital letters
-    	just like true high tones (on with -optionalhigh=true)
-	-t	use raw text instead of HTML for the output file (on with -t=true)
+    	just like true high tones
+        -re string
+    	on the fly regular expression deletion. Uses Golang (Google RE2) format.
+    	See https://github.com/google/re2/wiki/Syntax, https://regex101.com/
+        -t	use raw text instead of HTML for the output file
 
 Download: [Releases](https://github.com/tassa-yoniso-manasi-karoto/giita/releases)
