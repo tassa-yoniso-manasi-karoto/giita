@@ -1,7 +1,7 @@
 CLI tool to format latin script Pali for chanting in the Thai style.
 
-This script was written with the Makhot style of the Dhammayut order in mind but its output can also be used for the Saṁyok style of the Maha Nikaya order.
-This script implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
+This program was written with the Makhot style of the Dhammayut order in mind but its output can also be used for the Saṁyok style of the Maha Nikaya order.
+This program implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
 <p align="center">Try it on CodePen: https://codepen.io/tassa-yoniso-manasi-karoto/pen/poaOedv</p>
@@ -12,14 +12,24 @@ This script implements the tone rules provided at https://www.dhammatalks.org/eb
 - in the HTML format, no formatting is hardcoded and **all formatting can be changed in the embedded CSS**
 - the above mentionned guide does not provide a way to identify syllables which can get the optional low tone therefore this is not implemented
 - optional high tones are disabled by default and *will* result in false positives
-- this script is provided here "for posterity" and will not be actively maintained
+- this program provided here "for posterity" and will not be actively maintained
 - To chant in the Saṁyok style, uncomment  "/\*font-weight: 300;\*/" in the embedded CSS to create a visual difference between long and short syllables.
 - keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting is not always accurate!
 
 ### Known issues
 - ambiguous "ay" cases like "viheṭhayanto" where it could referer either to the "ay" long vowel or an "a" followed by a "y"
-- \*brāhma\* words.
-- nh* exceptions: nhārū, nhāyeyya
+- non standard syllables embedded in the middle/end of a word : any \*brāhma, \*nhārū, \*nhāyeyya derivates
+
+### Hints
+
+You may rarely encounter this formatting, a wavy underline with a vertical bar:
+
+<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/hints.webp">
+
+This hint is guaranteed to be on a long syllable. It occurs in sentences with at least one long compound word, it is a suggested location to make the syllable extra long in order to have the time to read the rest, or, a short pause to catch one's breath.
+
+Note that this is an added feature and not a feature of the Makhot style.
+
 
 ### Usage of giita:
         -c string

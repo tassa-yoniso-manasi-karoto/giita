@@ -373,6 +373,7 @@ func main() {
 		}*/
 		for _, unit := range Syllable.Units {
 			if strings.Contains(unit.Str, "\n") {
+				// FIXME one empty newline = two \n, so -l 2 is a factor 2 operation, need a smaller step
 				buf.WriteString(strings.ReplaceAll(unit.Str, "\n", newline))
 			} else if reSpace.MatchString(unit.Str) {
 				buf.WriteString(" ")
@@ -489,14 +490,15 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 		var (
 			PrevUnit, NextUnit, NextNextUnit UnitType
 			notBeforeTwoCons                 bool
+			accept                           = true
 		)
+		if i+1 < len(Units) {
+			NextUnit = Units[i+1]
+		}
 		if i+2 < len(Units) {
 			NextNextUnit = Units[i+2]
 		} else {
 			notBeforeTwoCons = true
-		}
-		if i+1 < len(Units) {
-			NextUnit = Units[i+1]
 		}
 		if i-1 >= 0 {
 			PrevUnit = Units[i-1]
@@ -504,16 +506,21 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 		if !(NextUnit.Type == Cons && NextNextUnit.Type == Cons) {
 			notBeforeTwoCons = true
 		}
+		// get a dangling consonant at the end of the word included in
+		// the (currently iterated) previous syllable
+		if NextUnit.Type == Cons && contains(IrrelevantTypes, NextNextUnit.Type) {
+			accept = false
+		}
 		//assume true, overwrite everything after setting exceptions
 		unit.Closing = true
 		// case no further input
 		if i+1 == len(Units) {
 		// case SU-PA-ṬI-pan-no
-		} else if unit.Type == ShortVwl && notBeforeTwoCons &&
+		} else if unit.Type == ShortVwl && notBeforeTwoCons && accept &&
 			!(strings.ToLower(NextUnit.Str) == "ṁ") &&
 			!(contains(NeverLastPos, NextUnit.Str) && !contains(VowelTypes, NextNextUnit.Type)) {
 		// case HO-mi
-		} else if unit.Type == LongVwl && notBeforeTwoCons &&
+		} else if unit.Type == LongVwl && notBeforeTwoCons && accept &&
 			!(strings.ToLower(NextUnit.Str) == "ṁ") {
 		// case sag-GAṀ and also "2 consonants in a row" case
 		} else if unit.Type == Cons &&
