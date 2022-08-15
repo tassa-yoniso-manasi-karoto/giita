@@ -37,6 +37,7 @@ COULD
 */
 
 const (
+	version = "v1.2.1"
 	LongVwl = iota
 	ShortVwl
 	Cons
@@ -72,13 +73,13 @@ var (
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptHighFirstChar  = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 
-	wantDebug                                      debugType
-	CurrentDir                                     string
-	Orange, Green, ANSIReset                       string
-	in, out, refCmt, UserCSSPath, UserRe, debugRaw *string
-	wantNewlineNum, wantFontSize                   *int
-	wantTxt, wantOptionalHigh, wantDark, wantHint  *bool
-	wantHtml                                       = true
+	wantDebug                                                   debugType
+	CurrentDir                                                  string
+	Orange, Green, ANSIReset                                    string
+	in, out, refCmt, UserCSSPath, UserRe, debugRaw              *string
+	wantNewlineNum, wantFontSize                                *int
+	wantTxt, wantOptionalHigh, wantDark, wantHint, wantVersion  *bool
+	wantHtml                                                    = true
 
 	DefaultTemplate = `<!DOCTYPE html> <html><head>
 <meta charset="UTF-8">
@@ -199,11 +200,16 @@ func main() {
 		"optionalhigh", false, "requires -t, it formats optional "+
 			"high tones with capital letters\njust like true high tones")
 	wantDark = flag.Bool("d", false, "dark mode, will use a white font on a dark background")
+	wantVersion = flag.Bool("version", false, "output version information and exit")
 	// INT
 	wantNewlineNum = flag.Int("l", 1, "set how many linebreaks will be created from a single "+
 		"linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
 	wantFontSize = flag.Int("f", 34, "set font size")
 	flag.Parse()
+	if *wantVersion {
+		fmt.Println("giita", version)
+		os.Exit(0)
+	}
 	if len(*refCmt) != 3 {
 		panic("You provided an invalid input of comment marks.")
 	}
@@ -492,13 +498,13 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 			notBeforeTwoCons                 bool
 			accept                           = true
 		)
-		if i+1 < len(Units) {
-			NextUnit = Units[i+1]
-		}
 		if i+2 < len(Units) {
 			NextNextUnit = Units[i+2]
 		} else {
 			notBeforeTwoCons = true
+		}
+		if i+1 < len(Units) {
+			NextUnit = Units[i+1]
 		}
 		if i-1 >= 0 {
 			PrevUnit = Units[i-1]
