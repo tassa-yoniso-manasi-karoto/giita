@@ -62,5 +62,8 @@ Note that this is an added feature and not a feature of the Makhot style.
     	on the fly regular expression deletion. Uses Golang (Google RE2) format.
     	See https://github.com/google/re2/wiki/Syntax, https://regex101.com/
         -t	use raw text instead of HTML for the output file
+        -version
+    	output version information and exit
+
 
 Download: [Releases](https://github.com/tassa-yoniso-manasi-karoto/giita/releases)
