@@ -26,7 +26,7 @@ You may rarely encounter this formatting, a wavy underline with a vertical bar:
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/hints.webp">
 
-This hint is guaranteed to be on a long syllable. It occurs in sentences with at least one long compound word, it is a suggested location to make the syllable extra long in order to have the time to read the rest, or, a short pause to catch one's breath.
+This hint is guaranteed to be on a long syllable. It occurs in sentences with a long compound word or in enumerations where punctuation is missing, it is a suggested location to make the syllable extra long in order to have the time to read the rest, or, a short pause to catch one's breath.
 
 Note that this is an added feature and not a feature of the Makhot style.
 
@@ -42,9 +42,11 @@ Note that this is an added feature and not a feature of the Makhot style.
         -d	dark mode, will use a white font on a dark background
         -f int
     	set font size (default 34)
-        -hint
-    	suggests hints on where to catch one's breath in long compound words.
-    	(disable with -hint=false) (default true)
+        -hint float
+    	suggests hints on where to catch one's breath in long compound words or
+    	list/enumerations missing proper punctuation.
+    	Superior values increase sensitivity as to what counts as a list.
+    	Reasonable range between 4 and 8, disabled with -hint 0. (default 4.5)
         -i string
     	path of input UTF-8 encoded text file
     	 (default: "input.txt" in directory of executable)

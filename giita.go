@@ -4,9 +4,11 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"html"
+	"io/fs"
 	"math"
 	"os"
 	"path"
@@ -19,7 +21,7 @@ import (
 	"unicode/utf8"
 )
 
-const version = "v1.2.1"
+const version = "v1.2.2"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -74,13 +76,15 @@ var (
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptHighFirstChar  = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 
-	wantDebug                                                   debugType
-	CurrentDir                                                  string
-	Orange, Green, ANSIReset                                    string
-	in, out, refCmt, UserCSSPath, UserRe, debugRaw              *string
-	wantNewlineNum, wantFontSize                                *int
-	wantTxt, wantOptionalHigh, wantDark, wantHint, wantVersion  *bool
-	wantHtml                                                    = true
+	wantDebug                                        debugType
+	CurrentDir                                       string
+	Orange, Green, ANSIReset                         string
+	in, out, refCmt, UserCSSPath, UserRe, debugRaw   *string
+	wantNewlineNum, wantFontSize                     *int
+	wantHint                                         *float64
+	wantTxt, wantOptionalHigh, wantDark, wantVersion *bool
+	wantHtml                                         = true
+
 
 	DefaultTemplate = `<!DOCTYPE html> <html><head>
 <meta charset="UTF-8">
@@ -141,8 +145,8 @@ body {
 )
 
 type debugType struct {
-	Perf, Hint, Rate, Parser, Stats bool
-	Time                            time.Time
+	Perf, Hint, Rate, Parser, Stats, CSS, List bool
+	Time                                       time.Time
 }
 
 type UnitType struct {
@@ -190,12 +194,12 @@ func main() {
 	in = flag.String("i", CurrentDir+"/input.txt", "path of input UTF-8 encoded text file\n")
 	out = flag.String("o", CurrentDir+"/output.htm", "path of output file\n")
 	UserCSSPath = flag.String("css", "", "will overwrite all CSS and CSS-related options with the CSS file at\nthis path.")
-	UserRe = flag.String("re", "", "on the fly regular expression deletion. Uses Golang (Google RE2) format.\nSee https://github.com/google/re2/wiki/Syntax, https://regex101.com/")
+	UserRe = flag.String("re", "", "on the fly regular expression deletion. Uses Golang (Google RE2) format."+
+		"\nSee https://github.com/google/re2/wiki/Syntax, https://regex101.com/")
 	refCmt = flag.String("c", "[:]", "allow comments in input file and specify which "+
 		"characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
-	debugRaw = flag.String("debug", "", "select desired modules \"perf:hint:rate:parser:stats_pprofFileSuffix\"")
+	debugRaw = flag.String("debug", "", "select desired modules \"perf:hint:rate:parser:css:stats:list_pprofFileSuf\nfix\"")
 	// BOOL
-	wantHint = flag.Bool("hint", true, "suggests hints on where to catch one's breath in long compound words.\n(disable with -hint=false)")
 	wantTxt = flag.Bool("t", false, "use raw text instead of HTML for the output file")
 	wantOptionalHigh = flag.Bool(
 		"optionalhigh", false, "requires -t, it formats optional "+
@@ -206,6 +210,11 @@ func main() {
 	wantNewlineNum = flag.Int("l", 1, "set how many linebreaks will be created from a single "+
 		"linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
 	wantFontSize = flag.Int("f", 34, "set font size")
+	// FLOAT
+	wantHint = flag.Float64("hint", 4.5, "suggests hints on where to catch one's breath in long compound words or\n"+
+		"list/enumerations missing proper punctuation."+
+			"\nSuperior values increase sensitivity as to what counts as a list."+
+				"\nReasonable range between 4 and 8, disabled with -hint 0.")
 	flag.Parse()
 	if *wantVersion {
 		fmt.Println("giita", version)
@@ -214,7 +223,12 @@ func main() {
 	if len(*refCmt) != 3 {
 		panic("You provided an invalid input of comment marks.")
 	}
+	CSS = fmt.Sprintf(CSS, *wantFontSize)
 	if *debugRaw != "" {
+		dat, err := os.ReadFile(CurrentDir + "/debug.css")
+		if wantDebug.CSS && !errors.Is(err, fs.ErrNotExist) {
+			CSS = string(dat)
+		}
 		suffix := parseDbg(*debugRaw)
 		if wantDebug.Perf {
 			f2, _ := os.Create("cpu" + suffix + ".prof")
@@ -229,11 +243,8 @@ func main() {
 	}
 	if wantDebug.Perf || wantDebug.Stats {
 		wantDebug.Time = time.Now()
-		defer func() {
-			fmt.Println(time.Since(wantDebug.Time))
-		}()
+		defer func(){fmt.Println(time.Since(wantDebug.Time))}()
 	}
-	CSS = fmt.Sprintf(CSS, *wantFontSize)
 	page := fmt.Sprintf(DefaultTemplate, CSS)
 	if *wantDark {
 		page = strings.Replace(page, "body {", "body {\n  background: black;\n  color: white;", 1)
@@ -267,16 +278,16 @@ func main() {
 		re := regexp.MustCompile(*UserRe)
 		src = re.ReplaceAllString(src, "")
 	}
-	src = strings.ReplaceAll(src, "ṃ", "ṁ")
-	src = strings.ReplaceAll(src, "Ṃ", "Ṁ")
-	// chunks from long compound words need to be reunited or will be treated as separate
-	src = strings.ReplaceAll(src, "-", "")
 	var cmts []string
 	if isFlagPassed("c") {
 		reCmt := regexp.MustCompile(fmt.Sprintf(`(?s)%s.*?%s`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3])))
 		cmts = reCmt.FindAllString(src, -1)
 		src = reCmt.ReplaceAllString(src, "𓃰")
 	}
+	src = strings.ReplaceAll(src, "ṃ", "ṁ")
+	src = strings.ReplaceAll(src, "Ṃ", "Ṁ")
+	// chunks from long compound words need to be reunited or will be treated as separate
+	src = strings.ReplaceAll(src, "-", "")
 	if strings.Contains(src, "...") || strings.Contains(src, "…") {
 		fmt.Printf("%sThe input contains %d occurence(s) of '...' or "+
 			"'…' which usually indicates an ellipsis of a repeated formula. "+
@@ -333,15 +344,15 @@ func main() {
 	// units have been corrected, just rebuild from scratch
 	Syllables = SyllableBuilder(RawUnits)
 	Syllables = SetTones(Syllables)
-	if *wantHint {
+	if *wantHint != 0 {
 		Segments := SegmentBuilder(Syllables)
 		SegmentProcessed := 0
 		for i, Segment := range Segments {
 			Segments[i] = Segment.MakeHint(i, &SegmentProcessed)
 		}
 		if wantDebug.Hint || wantDebug.Stats {
-			fmt.Printf("[hint] added hint(s) in %d%% of all segments (%d/%d)\n",
-				int(float64(SegmentProcessed)/float64(len(Segments))*100), int(SegmentProcessed), len(Segments))
+			fmt.Printf("[hint] added hint(s) in %.1f%% of all segments (%d/%d)\n",
+				float64(SegmentProcessed)/float64(len(Segments))*100, int(SegmentProcessed), len(Segments))
 		}
 		Syllables = []SyllableType{}
 		for _, Segment := range Segments {
@@ -483,7 +494,7 @@ func Parser(src string) (RawUnits []UnitType) {
 		Done += 1
 	}
 	if wantDebug.Parser || wantDebug.Stats {
-		fmt.Printf("[parser] String match account for %d%% of all matches (%d/%d)\n", int(StrMatch/Done*100), int(StrMatch), int(Done))
+		fmt.Printf("[parser] String match account for %.1f%% of all matches (%d/%d)\n", StrMatch/Done*100, int(StrMatch), int(Done))
 	}
 	return
 }
@@ -497,7 +508,7 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 		var (
 			PrevUnit, NextUnit, NextNextUnit UnitType
 			notBeforeTwoCons                 bool
-			accept                           = true
+			shouldAccept                     = true
 		)
 		if i+2 < len(Units) {
 			NextNextUnit = Units[i+2]
@@ -516,18 +527,18 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 		// get a dangling consonant at the end of the word included in
 		// the (currently iterated) previous syllable
 		if NextUnit.Type == Cons && contains(IrrelevantTypes, NextNextUnit.Type) {
-			accept = false
+			shouldAccept = false
 		}
 		//assume true, overwrite everything after setting exceptions
 		unit.Closing = true
 		// case no further input
 		if i+1 == len(Units) {
 		// case SU-PA-ṬI-pan-no
-		} else if unit.Type == ShortVwl && notBeforeTwoCons && accept &&
+		} else if unit.Type == ShortVwl && notBeforeTwoCons && shouldAccept &&
 			!(strings.ToLower(NextUnit.Str) == "ṁ") &&
 			!(contains(NeverLastPos, NextUnit.Str) && !contains(VowelTypes, NextNextUnit.Type)) {
 		// case HO-mi
-		} else if unit.Type == LongVwl && notBeforeTwoCons && accept &&
+		} else if unit.Type == LongVwl && notBeforeTwoCons && shouldAccept &&
 			!(strings.ToLower(NextUnit.Str) == "ṁ") {
 		// case sag-GAṀ and also "2 consonants in a row" case
 		} else if unit.Type == Cons &&
@@ -648,8 +659,8 @@ func (Segment SegmentType) MakeHint(i int, SegmentProcessed *int) SegmentType {
 			}
 		}
 		Rating := RatingType{sort.IntSlice(vals), indexes}
-		// if wantDebug.Hint { fmt.Printf("%v\n", Rating) }
 		sort.Stable(sort.Reverse(Rating))
+		if wantDebug.Hint { fmt.Printf("%v\n", Rating) }
 		if HighestRatedVal := Rating.IntSlice[0]; HighestRatedVal > 0 {
 			//fmt.Printf("SubsegmentTotal=%d\tTarget=%d\tMaxSpread=%d\n", SubsegmentTotal, Target, MaxSpread)
 			HighestRatedIndex := Rating.indexes[0]
@@ -748,9 +759,7 @@ func (Rating RatingType) Swap(i, j int) {
 	Rating.IntSlice.Swap(i, j)
 }
 
-func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target int, MaxSpread int, spread int) (score int) {
-	score = 100
-	StatsAtPos := Segment.DescribeUpTo(TargetIndex + spread)
+func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target int, MaxSpread int, spread int) int {
 	Syllable := Segment[TargetIndex+spread]
 	if wantDebug.Rate {
 		fmt.Print("\"")
@@ -766,6 +775,47 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 		return 0
 
 	}
+	var (
+		score = 100
+		listMode = false
+		StatsAtPos = Segment.DescribeUpTo(TargetIndex + spread)
+		beatsTotal = StatsTotal.Long*2 + StatsTotal.Short
+		beatsAtPos = StatsAtPos.Long*2 + StatsAtPos.Short
+		PrevTargetIndex = Segment.FindIndexCorrespondingToBeats(beatsAtPos-Target)
+		StatsAtPrev = Segment.DescribeUpTo(PrevTargetIndex)
+		NextTargetIndex = Segment.FindIndexCorrespondingToBeats(beatsAtPos+Target)
+		StatsAtNext = Segment.DescribeUpTo(NextTargetIndex)
+	)
+	//-------------------------------
+	// bonus when likely to be going through a list of items that corresponds to
+	// small words and where punctuation is likely missing
+	// ajjhattikā pathavīdhātu    = 84/19 = 4.42
+	// ajjhattikā ākāsadhātu pt2  = 80/16 = 5.00
+	// akankheyya std formula     = 79/8  = 9.88
+	ratio := float64(beatsTotal)/float64(StatsTotal.Space)
+	if wantDebug.List && spread == 0 {
+		i := 0
+		for _, syl := range Segment {
+			for _, unit := range syl.Units {
+				if i += 1; i > 80 { break }
+				fmt.Print(unit.Str)
+			}
+		}
+		fmt.Printf("\nbeatsTotal=%d\t3*Target=%d\t%t\t\tTotal.Space=%d\tratio=%.2f\t%t\n",
+			beatsTotal, 3*Target, beatsTotal > 3*Target,
+				StatsTotal.Space, ratio, ratio < *wantHint)
+	}
+	if beatsTotal > 3*Target && ratio < *wantHint {
+		if wantDebug.List && spread == 0 {
+			fmt.Println(Green + "^ IS LIST ^" + ANSIReset)
+		}
+		if wantDebug.Rate {
+			fmt.Println("\t[rate] List override")
+		}
+		listMode = true
+	}
+	//-------------------------------
+	// Penalty/bonus for surrounding spaces
 	//           │ i negative │ i positive
 	// ──────────┼────────────┼──────────────
 	// w/ space  │    ---     │     +++
@@ -784,18 +834,28 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 				fullstring += unit.Str
 			}
 			var factor float64
+			// negative factor = bonus
 			switch { // ContainsAny with NBSP??
 			case strings.Contains(fullstring, " ") && i < 0:
 				factor = 30.0
 			case strings.Contains(fullstring, " ") && i > 1:
+				// FIXME was superseded by immediately upcomming space Bonus
 				factor = -20.0 * float64(MaxSpreadSpace) / float64(i)
 			case !strings.Contains(fullstring, " ") && i < 0:
 				factor = -3.0
 			}
+			// in lists words are likely to be short, a pause suggestion in the
+			// middle of a word is unwanted
+			if listMode && factor < 0 {
+				factor = factor*10
+			}
 			subPenalty := int(float64(MaxSpreadSpace) / -float64(i) * factor)
 			penalty += subPenalty
 			if wantDebug.Rate && subPenalty != 0 {
-				fmt.Printf("\t\t%d due to \"%s\" at index %d (factor %d)\n", -subPenalty, fullstring, i, int(factor))
+				fmt.Printf("\t\t%d due to \"%s\" at index %d (factor %d)",
+					-subPenalty, fullstring, i, int(factor))
+				if listMode && factor < 0 { fmt.Print(" ", listMode) }
+				fmt.Print("\n")
 			}
 			score -= subPenalty
 		}
@@ -804,7 +864,9 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 		fmt.Println("\t       SpaceAROUND TOTAL Penalty of", -penalty)
 	}
 	//-------------------------------
-	if StatsTotal.Space-StatsAtPos.Space >= 0 {
+	// FIXME is this really useful?
+	// the last part of the if checks if we're anywhere inside a long compound word
+	if !listMode && StatsTotal.Space-StatsAtPos.Space >= 0 && !(StatsAtNext.Space-StatsAtPos.Space == 0 || StatsAtPrev.Space-StatsAtPos.Space == 0) {
 		penalty := (StatsTotal.Space - StatsAtPos.Space) * 50
 		score -= penalty
 		if wantDebug.Rate {
@@ -817,19 +879,16 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 	}*/
 	//-------------------------------
 	// penality for a pause close to the end of the segment
-	beatsTotal := StatsTotal.Long*2 + StatsTotal.Short
-	beatsAtPos := StatsAtPos.Long*2 + StatsAtPos.Short
 	if i := beatsTotal-beatsAtPos; i < Target+MaxSpread {
-		// +1 to prevent a zero division panic
-		penalty := int(math.Pow(5.0, float64(Target)/(float64(i+1.0)*0.5)))
+		// +1 to prevent a zero division panic. 0.42 = finetuned = careful
+		penalty := int(math.Pow(5.0, float64(Target)/(float64(i+1.0)*0.42)))
 		score -= penalty
 		if wantDebug.Rate {
 			fmt.Println("\t[rate] Border Penalty of", -penalty)
 		}
 	}
 	//-------------------------------
-	NextTargetIndex := Segment.FindIndexCorrespondingToBeats(beatsAtPos + Target)
-	StatsAtNext := Segment.DescribeUpTo(NextTargetIndex)
+	// bonus for the the syl before the space before a long compound word or within a list
 	bonus := 0
 	var NextFullstring string
 	if i:= TargetIndex+spread+1; i < len(Segment) {
@@ -837,15 +896,12 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 			NextFullstring += unit.Str
 		}
 	}
-	if strings.Contains(NextFullstring, " ") && StatsAtNext.Space-StatsAtPos.Space == 1 {
-		bonus = (StatsAtNext.Space-StatsAtPos.Space)*150
+	if strings.Contains(NextFullstring, " ") && (StatsAtNext.Space-StatsAtPos.Space == 1 || listMode)  {
+		bonus = 150
 		score += bonus
-	}
-	if i:= 0; wantDebug.Rate {
-		if i = StatsAtNext.Space-StatsAtPos.Space; i < 0 {
-			i = 0
+		if wantDebug.Rate {
+			fmt.Println("\t[rate] with one immediately upcomming space Bonus of", bonus)
 		}
-		fmt.Println("\t[rate] with", i, "immediately upcomming space Bonus of", bonus)
 	}
 	//-------------------------------
 	if spread < 0 {
@@ -859,7 +915,7 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 	if wantDebug.Rate {
 		fmt.Println("score", score)
 	}
-	return
+	return score
 }
 
 func appendClass(class, s string) string {
@@ -919,6 +975,10 @@ func parseDbg(debugRaw string) (suffix string) {
 			wantDebug.Parser = true
 		case "stats":
 			wantDebug.Stats = true
+		case "css":
+			wantDebug.CSS = true
+		case "list":
+			wantDebug.List = true
 		}
 	}
 	return
