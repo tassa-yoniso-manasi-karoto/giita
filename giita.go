@@ -32,6 +32,7 @@ const version = "v1.2.2"
 TODO
 	make test files
 COULD
+	pretty print? (i.e. wrap quotes nicely)
 	diff against ↓ to find exceptions (all long falling tones?): METta, viMOKkha, sometime also pāṭiMOKkhe
 	https://www.dhammatalks.org/books/ChantingGuide/Section0000.html,
 	use something like /digitalpalireader/_dprhtml/js/analysis_function.js to
@@ -68,7 +69,9 @@ var (
 	reLongVwls  []*regexp.Regexp
 	reShortVwls []*regexp.Regexp
 
-	C   = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm", "ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ", "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
+	C = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "sm",
+		"ch", "c", "g", "h", "s", "j", "r", "p", "b", "d", "k", "t", "ṭ",
+		 "m", "ṁ", "ṃ", "n", "ñ", "ṅ", "ṇ", "y", "l", "ḷ", "ḍ", "v"}
 	reC []*regexp.Regexp
 
 	NeverLastPos      = []string{"bh", "dh", "ḍh", "gh", "jh", "kh", "ph", "th", "ṭh", "v", "r"}
@@ -198,7 +201,7 @@ func main() {
 		"\nSee https://github.com/google/re2/wiki/Syntax, https://regex101.com/")
 	refCmt = flag.String("c", "[:]", "allow comments in input file and specify which "+
 		"characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
-	debugRaw = flag.String("debug", "", "select desired modules \"perf:hint:rate:parser:css:stats:list_pprofFileSuf\nfix\"")
+	debugRaw = flag.String("debug", "", "select desired modules \"perf:hint:rate:parser:css:stats:list\n_pprofFileSuffix\"")
 	// BOOL
 	wantTxt = flag.Bool("t", false, "use raw text instead of HTML for the output file")
 	wantOptionalHigh = flag.Bool(
@@ -432,7 +435,7 @@ func main() {
 	if isFlagPassed("c") {
 		for _, cmt := range cmts {
 			if wantHtml {
-				cmt = html.EscapeString(cmt) //(cmt[1:len(cmt)-1])
+				cmt = html.EscapeString(cmt)
 				cmt = "<span class=comment>" + cmt + "</span>"
 			}
 			outstr = strings.Replace(outstr, "𓃰", cmt, 1)
@@ -443,6 +446,9 @@ func main() {
 	fmt.Println("Done")
 }
 
+// first try w/ the list of short, long vwl and cons in lower case,
+// frequently encountered punctuation, space/newline/nbsp, digits then try with regex.
+// On average 97% of the parsing can be accomplised without using regex.
 func Parser(src string) (RawUnits []UnitType) {
 	f := func(m string, src *string, i int) (u UnitType) {
 		u = UnitType{Str: m, Type: i}
@@ -452,46 +458,35 @@ func Parser(src string) (RawUnits []UnitType) {
 	var StrMatch, Done float64
 	Lists := [][]string{LongVwls, ShortVwls, C, FrequentPunc, FrequentSpace, FrequentOther}
 	reLists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC, []*regexp.Regexp{rePunc}, []*regexp.Regexp{reSpace}}
+	// Note: rewrite with generics = func 13% more CPU intensive + more than twice the length
+Outerloop:
 	for src != "" {
 		found := false
-		// first try w/ the list of short, long vwl and cons in lower case,
-		// frequently encountered punctuation, space/newline/nbsp, digits then try with regex.
-		// On average 97% of the parsing can be accomplised without using regex.
+		Done += 1
 		for i, list := range Lists {
 			for _, s := range list {
 				if found = strings.HasPrefix(src, s); found {
 					RawUnits = append(RawUnits, f(s, &src, i))
 					StrMatch += 1
-					break
-				}
-			}
-			if found {
-				break
-			}
-		}
-		if !found {
-			for i, list := range reLists {
-				for _, re := range list {
-					if found = re.MatchString(src); found {
-						m := re.FindString(src)
-						RawUnits = append(RawUnits, f(m, &src, i))
-						break
-					}
-				}
-				if found {
-					break
+					continue Outerloop
 				}
 			}
 		}
-		if !found {
-			r, _ := utf8.DecodeRuneInString(src)
-			char := string(r)
-			RawUnits = append(RawUnits, f(char, &src, Other))
-			if wantDebug.Parser && char != "𓃰" {
-				fmt.Printf("'%s': Non-Pali/Unknown Char (%U)\n", char, r)
+		for i, list := range reLists {
+			for _, re := range list {
+				if found = re.MatchString(src); found {
+					m := re.FindString(src)
+					RawUnits = append(RawUnits, f(m, &src, i))
+					continue Outerloop
+				}
 			}
 		}
-		Done += 1
+		r, _ := utf8.DecodeRuneInString(src)
+		char := string(r)
+		RawUnits = append(RawUnits, f(char, &src, Other))
+		if wantDebug.Parser && char != "𓃰" {
+			fmt.Printf("'%s': Non-Pali/Unknown Char (%U)\n", char, r)
+		}
 	}
 	if wantDebug.Parser || wantDebug.Stats {
 		fmt.Printf("[parser] String match account for %.1f%% of all matches (%d/%d)\n", StrMatch/Done*100, int(StrMatch), int(Done))
@@ -554,9 +549,7 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 			Syllable = *new(SyllableType)
 		}
 		Syllable.Units = append(Syllable.Units, unit)
-		if unit.Closing ||
-			contains(IrrelevantTypes, NextUnit.Type) &&
-				!contains(IrrelevantTypes, unit.Type) {
+		if unit.Closing || contains(IrrelevantTypes, NextUnit.Type) && !contains(IrrelevantTypes, unit.Type) {
 			Syllables = append(Syllables, Syllable)
 			Syllable = *new(SyllableType)
 		}
@@ -782,8 +775,8 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 		beatsTotal = StatsTotal.Long*2 + StatsTotal.Short
 		beatsAtPos = StatsAtPos.Long*2 + StatsAtPos.Short
 		PrevTargetIndex = Segment.FindIndexCorrespondingToBeats(beatsAtPos-Target)
-		StatsAtPrev = Segment.DescribeUpTo(PrevTargetIndex)
 		NextTargetIndex = Segment.FindIndexCorrespondingToBeats(beatsAtPos+Target)
+		StatsAtPrev = Segment.DescribeUpTo(PrevTargetIndex)
 		StatsAtNext = Segment.DescribeUpTo(NextTargetIndex)
 	)
 	//-------------------------------
@@ -866,7 +859,8 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 	//-------------------------------
 	// FIXME is this really useful?
 	// the last part of the if checks if we're anywhere inside a long compound word
-	if !listMode && StatsTotal.Space-StatsAtPos.Space >= 0 && !(StatsAtNext.Space-StatsAtPos.Space == 0 || StatsAtPrev.Space-StatsAtPos.Space == 0) {
+	if !listMode && StatsTotal.Space-StatsAtPos.Space >= 0 &&
+		!(StatsAtNext.Space-StatsAtPos.Space == 0 || StatsAtPrev.Space-StatsAtPos.Space == 0) {
 		penalty := (StatsTotal.Space - StatsAtPos.Space) * 50
 		score -= penalty
 		if wantDebug.Rate {
