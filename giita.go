@@ -443,95 +443,52 @@ func main() {
 	fmt.Println("Done")
 }
 
-
-type String string
-type Regex struct {
-	Value *regexp.Regexp
-}
-
-func convToAliasString(Lists [][]string) (myLists [][]String){
-	myLists = make([][]String, len(Lists))
-	for i, list := range Lists {
-		tmp := make([]String, len(list))
-		for j, s := range list {
-			tmp[j] = String(s)
-		}
-		myLists[i] = tmp
-	}
-	return
-}
-
-func convToAliasRegex(reLists [][]*regexp.Regexp) (myReLists [][]Regex){
-	myReLists = make([][]Regex, len(reLists))
-	for i, list := range reLists {
-		tmp := make([]Regex, len(list))
-		for j, re := range list {
-			tmp[j] = Regex{Value: re}
-		}
-		myReLists[i] = tmp
-	}
-	return
-}
-
-func (myString String) Match(src *string, c chan UnitType, i int) (found bool) {
-	s := string(myString)
-	if found = strings.HasPrefix(*src, s); found {
-		c <- UnitType{Str: s, Type: i}
-		*src = strings.TrimPrefix(*src, s)
-	}
-	return
-}
-
-func (myRegex Regex) Match(src *string, c chan UnitType, i int) (found bool) {
-	re := (*regexp.Regexp)(myRegex.Value)
-	if found = re.MatchString(*src); found {
-		m := re.FindString(*src)
-		c <- UnitType{Str: m, Type: i}
+func Parser(src string) (RawUnits []UnitType) {
+	f := func(m string, src *string, i int) (u UnitType) {
+		u = UnitType{Str: m, Type: i}
 		*src = strings.TrimPrefix(*src, m)
+		return
 	}
-	return
-}
-
-type canMatch interface {
-    Match(src *string, c chan UnitType, i int) bool
-}
-
-func iterateMatch[T canMatch](lists [][]T, src *string, c chan UnitType) (found bool) {
-	for i, list := range lists {
-		for _, T := range list {
-			found = T.Match(src, c, i)
+	var StrMatch, Done float64
+	Lists := [][]string{LongVwls, ShortVwls, C, FrequentPunc, FrequentSpace, FrequentOther}
+	reLists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC, []*regexp.Regexp{rePunc}, []*regexp.Regexp{reSpace}}
+	for src != "" {
+		found := false
+		// first try w/ the list of short, long vwl and cons in lower case,
+		// frequently encountered punctuation, space/newline/nbsp, digits then try with regex.
+		// On average 97% of the parsing can be accomplised without using regex.
+		for i, list := range Lists {
+			for _, s := range list {
+				if found = strings.HasPrefix(src, s); found {
+					RawUnits = append(RawUnits, f(s, &src, i))
+					StrMatch += 1
+					break
+				}
+			}
 			if found {
-				return
+				break
 			}
 		}
-	}
-	return
-}
-
-// first try w/ the list of short, long vwl and cons in lower case,
-// frequently encountered punctuation, space/newline/nbsp, digits then try with regex.
-// On average >97% of the parsing can be accomplised without using regex.
-func Parser(src string) (RawUnits []UnitType) {
-	var (
-		StrMatch, Done float64
-		c = make(chan UnitType, 1)
-	)
-	Lists := convToAliasString([][]string{LongVwls, ShortVwls, C, FrequentPunc, FrequentSpace, FrequentOther})
-	ReLists := convToAliasRegex([][]*regexp.Regexp{reLongVwls, reShortVwls, reC, []*regexp.Regexp{rePunc}, []*regexp.Regexp{reSpace}})
-	for src != "" {
-		switch {
-		case iterateMatch(Lists, &src, c):
-			RawUnits = append(RawUnits, <-c)
-			StrMatch += 1
-		case iterateMatch(ReLists, &src, c):
-			RawUnits = append(RawUnits, <-c)
-		default:
+		if !found {
+			for i, list := range reLists {
+				for _, re := range list {
+					if found = re.MatchString(src); found {
+						m := re.FindString(src)
+						RawUnits = append(RawUnits, f(m, &src, i))
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+		}
+		if !found {
 			r, _ := utf8.DecodeRuneInString(src)
 			char := string(r)
-			src = strings.TrimPrefix(src, char)
-			RawUnits = append(RawUnits, UnitType{Str: char, Type: Other})
+			RawUnits = append(RawUnits, f(char, &src, Other))
 			if wantDebug.Parser && char != "𓃰" {
-				fmt.Printf("'%s': Non-Pali/Unknown Character (%U)\n", char, r)
+				fmt.Printf("'%s': Non-Pali/Unknown Char (%U)\n", char, r)
 			}
 		}
 		Done += 1
