@@ -459,6 +459,7 @@ func Parser(src string) (RawUnits []UnitType) {
 	Lists := [][]string{LongVwls, ShortVwls, C, FrequentPunc, FrequentSpace, FrequentOther}
 	reLists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC, []*regexp.Regexp{rePunc}, []*regexp.Regexp{reSpace}}
 	// Note: rewrite with generics = func 13% more CPU intensive + more than twice the length
+	// archived in commit bc90408901aed35032ced3ca31e3ea7a8ad2cf2e
 Outerloop:
 	for src != "" {
 		found := false
