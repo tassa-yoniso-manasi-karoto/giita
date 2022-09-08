@@ -1,6 +1,6 @@
 CLI tool to format latin script Pali for chanting in the Thai style.
 
-This program was written with the Makhot style of the Dhammayut order in mind but its output can also be used for the Saṁyok style of the Maha Nikaya order with the --samyok argument.
+This program was written with the Makhot style of the Dhammayut order in mind but with the *--samyok* flag its output can also be used for the Saṁyok style of the Maha Nikaya order.
 This program implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
@@ -13,7 +13,7 @@ This program implements the tone rules provided at https://www.dhammatalks.org/e
 - the above mentionned guide does not provide a way to identify syllables which can get the optional low tone therefore this is not implemented
 - optional high tones are disabled by default and *will* result in false positives
 - this program provided here "for posterity" and will not be actively maintained
-- *To chant in the Saṁyok style,* try passing the -samyok flag which will tweak the default CSS to create a visual difference between long and short syllables and remove the orange blocks (which corresponds to pauses in Makhot).
+- **To chant in the Saṁyok style,** try passing the -samyok flag which will tweak the default CSS to create a visual difference between long and short syllables and remove the orange blocks (which corresponds to pauses in Makhot).
 - keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting is not always accurate!
 
 ### Known issues
