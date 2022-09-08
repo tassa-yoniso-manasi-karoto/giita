@@ -21,7 +21,7 @@ import (
 	"unicode/utf8"
 )
 
-const version = "v1.2.2"
+const version = "v1.2.3"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -79,15 +79,14 @@ var (
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptHighFirstChar  = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 
-	wantDebug                                        debugType
-	CurrentDir                                       string
-	Orange, Green, ANSIReset                         string
-	in, out, refCmt, UserCSSPath, UserRe, debugRaw   *string
-	wantNewlineNum, wantFontSize                     *int
-	wantHint                                         *float64
-	wantTxt, wantOptionalHigh, wantDark, wantVersion *bool
-	wantHtml                                         = true
-
+	wantDebug                                                    debugType
+	CurrentDir                                                   string
+	Orange, Green, ANSIReset                                     string
+	in, out, refCmt, UserCSSPath, UserRe, debugRaw               *string
+	wantNewlineNum, wantFontSize                                 *int
+	wantHint                                                     *float64
+	wantTxt, wantOptionalHigh, wantDark, wantVersion, wantSamyok *bool
+	wantHtml                                                     = true
 
 	DefaultTemplate = `<!DOCTYPE html> <html><head>
 <meta charset="UTF-8">
@@ -208,6 +207,7 @@ func main() {
 		"optionalhigh", false, "requires -t, it formats optional "+
 			"high tones with capital letters\njust like true high tones")
 	wantDark = flag.Bool("d", false, "dark mode, will use a white font on a dark background")
+	wantSamyok = flag.Bool("samyok", false, "use CSS optimized for chanting in the Samyok style")
 	wantVersion = flag.Bool("version", false, "output version information and exit")
 	// INT
 	wantNewlineNum = flag.Int("l", 1, "set how many linebreaks will be created from a single "+
@@ -249,6 +249,11 @@ func main() {
 		defer func(){fmt.Println(time.Since(wantDebug.Time))}()
 	}
 	page := fmt.Sprintf(DefaultTemplate, CSS)
+	if *wantSamyok {
+		page = strings.Replace(page, ".long {", ".long {\n font-weight: bold;", 1)
+		page = strings.Replace(page, ".short {\n /*font-weight: 300;*/", ".short {\n font-weight: 300;", 1)
+		page = regexp.MustCompile(`\n\.punct::after[^}]+}\n`).ReplaceAllString(page, "")
+	}
 	if *wantDark {
 		page = strings.Replace(page, "body {", "body {\n  background: black;\n  color: white;", 1)
 		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";", ".s::before{\n  content: \"⸱\";\n  color: #858585;", 1)
@@ -275,6 +280,9 @@ func main() {
 	fmt.Println("In:", *in)
 	fmt.Println("Out:", *out)
 	dat, err := os.ReadFile(*in)
+	if errors.Is(err, fs.ErrNotExist) {
+		fmt.Println(Orange + "Input \"giita -h\" to display the command line usage.\n" + ANSIReset)
+	}
 	check(err)
 	src := string(dat)
 	if *UserRe != "" {
@@ -422,8 +430,7 @@ func main() {
 		if h+1 < len(Syllables) {
 			lastUnit := Syllable.Units[len(Syllable.Units)-1]
 			NextSylFirstUnit := Syllables[h+1].Units[0]
-			if !contains(IrrelevantTypes, lastUnit.Type) &&
-				!contains(IrrelevantTypes, NextSylFirstUnit.Type) {
+			if !contains(IrrelevantTypes, lastUnit.Type) && !contains(IrrelevantTypes, NextSylFirstUnit.Type) {
 				buf.WriteString(separator)
 			}
 		}
@@ -544,8 +551,7 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 			unit.Closing = false
 		}
 		//----
-		if contains(IrrelevantTypes, PrevUnit.Type) &&
-			!contains(IrrelevantTypes, unit.Type) {
+		if contains(IrrelevantTypes, PrevUnit.Type) && !contains(IrrelevantTypes, unit.Type) {
 			Syllables = append(Syllables, Syllable)
 			Syllable = *new(SyllableType)
 		}
@@ -571,7 +577,7 @@ func SetTones(Syllables []SyllableType) []SyllableType {
 			}
 			if (unit.Type == ShortVwl && strings.ToLower(NextUnit.Str) == "ṁ") ||
 				(unit.Type == ShortVwl && NextUnit.Type == Cons && NextUnit.Closing) ||
-				(unit.Type == LongVwl) {
+					(unit.Type == LongVwl) {
 				Syllable.IsLong = true
 			}
 			if contains(UnstopChar, strings.ToLower(unit.Str)) && unit.Closing ||
@@ -634,7 +640,7 @@ func (Segment SegmentType) MakeHint(i int, SegmentProcessed *int) SegmentType {
 	BeatsTotal := StatsTotal.Long*2 + StatsTotal.Short
 	BeatsDone := 0
 	// Target is the number of beats around which we search. Beats = long Syllables increment by 2 and spaces by 0.
-	// TargetIndex is the corresponding position expressed as a regular array index.
+	// TargetIdx is the corresponding position expressed as a regular array index.
 	// MaxSpread is also expressed in array increments, not in beats, and corresponds to the radius, not the diameter.
 	Target := 22
 	MaxSpread := 3
@@ -643,13 +649,13 @@ func (Segment SegmentType) MakeHint(i int, SegmentProcessed *int) SegmentType {
 		// +1 because need 1 more slot for the int that is the target (= the starting point)
 		vals := make([]int, MaxSpread*2+1)
 		indexes := make([]int, MaxSpread*2+1)
-		TargetIndex := Segment.FindIndexCorrespondingToBeats(Target + BeatsDone)
-		// if wantDebug.Hint {fmt.Println("TargetIndex", TargetIndex, "Target", Target, "SubsegmentTotal", SubsegmentTotal)}
-		for sp, index := -MaxSpread, 0; sp <= MaxSpread; sp++ {
+		TargetIdx := Segment.FindIdxMatchingBeats(Target + BeatsDone)
+		// if wantDebug.Hint {fmt.Println("TargetIdx", TargetIdx, "Target", Target, "SubsegmentTotal", SubsegmentTotal)}
+		for sp, idx := -MaxSpread, 0; sp <= MaxSpread; sp++ {
 			if 0 <= Target+sp && Target+sp < len(Segment) {
-				vals[index] = StatsTotal.rate(Segment, TargetIndex, Target, MaxSpread, sp)
-				indexes[index] = TargetIndex + sp
-				index += 1
+				vals[idx] = StatsTotal.rate(Segment, TargetIdx, Target, MaxSpread, sp)
+				indexes[idx] = TargetIdx + sp
+				idx += 1
 			}
 		}
 		Rating := RatingType{sort.IntSlice(vals), indexes}
@@ -657,20 +663,20 @@ func (Segment SegmentType) MakeHint(i int, SegmentProcessed *int) SegmentType {
 		if wantDebug.Hint { fmt.Printf("%v\n", Rating) }
 		if HighestRatedVal := Rating.IntSlice[0]; HighestRatedVal > 0 {
 			//fmt.Printf("SubsegmentTotal=%d\tTarget=%d\tMaxSpread=%d\n", SubsegmentTotal, Target, MaxSpread)
-			HighestRatedIndex := Rating.indexes[0]
+			HighestRatedIdx := Rating.indexes[0]
 			if wantDebug.Hint {
 				fmt.Print("@")
 				for j, Syllable := range Segment {
-					if j == HighestRatedIndex { fmt.Print(Green)}
+					if j == HighestRatedIdx { fmt.Print(Green)}
 					for _, unit := range Syllable.Units {
 						fmt.Print(unit.Str)
 					}
-					if j == HighestRatedIndex { fmt.Print(ANSIReset) }
+					if j == HighestRatedIdx { fmt.Print(ANSIReset) }
 				}
-				fmt.Printf("\n%sPASSED:%s the index chosen is %d\n", Green, ANSIReset, HighestRatedIndex)
+				fmt.Printf("\n%sPASSED:%s the index chosen is %d\n", Green, ANSIReset, HighestRatedIdx)
 			}
-			Segment[HighestRatedIndex].Hint = true
-			StatsAtPos := Segment.DescribeUpTo(HighestRatedIndex)
+			Segment[HighestRatedIdx].Hint = true
+			StatsAtPos := Segment.DescribeUpTo(HighestRatedIdx)
 			BeatsDone = StatsAtPos.Long*2 + StatsAtPos.Short
 			Target = 13
 			MaxSpread = 2
@@ -689,7 +695,7 @@ type StatsType struct {
 	Long, Short, Space int
 }
 // TODO Rewrite these two func with one underlying
-func (Segment SegmentType) FindIndexCorrespondingToBeats(Target int) (TargetIndex int) {
+func (Segment SegmentType) FindIdxMatchingBeats(Target int) (TargetIdx int) {
 	var Stats StatsType
 	for i, Syllable := range Segment {
 		if Syllable.Irrelevant {
@@ -714,7 +720,7 @@ func (Segment SegmentType) FindIndexCorrespondingToBeats(Target int) (TargetInde
 		}
 		// long cause +2 increment so an equality may not necessarily occur
 		if beats >= Target {
-			TargetIndex = i
+			TargetIdx = i
 			break
 		}
 	}
@@ -753,8 +759,8 @@ func (Rating RatingType) Swap(i, j int) {
 	Rating.IntSlice.Swap(i, j)
 }
 
-func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target int, MaxSpread int, spread int) int {
-	Syllable := Segment[TargetIndex+spread]
+func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int, MaxSpread int, spread int) int {
+	Syllable := Segment[TargetIdx+spread]
 	if wantDebug.Rate {
 		fmt.Print("\"")
 		for _, unit := range Syllable.Units {
@@ -772,13 +778,13 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 	var (
 		score = 100
 		listMode = false
-		StatsAtPos = Segment.DescribeUpTo(TargetIndex + spread)
+		StatsAtPos = Segment.DescribeUpTo(TargetIdx + spread)
 		beatsTotal = StatsTotal.Long*2 + StatsTotal.Short
 		beatsAtPos = StatsAtPos.Long*2 + StatsAtPos.Short
-		PrevTargetIndex = Segment.FindIndexCorrespondingToBeats(beatsAtPos-Target)
-		NextTargetIndex = Segment.FindIndexCorrespondingToBeats(beatsAtPos+Target)
-		StatsAtPrev = Segment.DescribeUpTo(PrevTargetIndex)
-		StatsAtNext = Segment.DescribeUpTo(NextTargetIndex)
+		PrevTargetIdx = Segment.FindIdxMatchingBeats(beatsAtPos-Target)
+		NextTargetIdx = Segment.FindIdxMatchingBeats(beatsAtPos+Target)
+		StatsAtPrev = Segment.DescribeUpTo(PrevTargetIdx)
+		StatsAtNext = Segment.DescribeUpTo(NextTargetIdx)
 	)
 	//-------------------------------
 	// bonus when likely to be going through a list of items that corresponds to
@@ -821,7 +827,7 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 		fmt.Println("\t[rate] SpaceAROUND SubPenalties ")
 	}
 	for i := -MaxSpreadSpace; i <= MaxSpreadSpace; i++ {
-		j := TargetIndex + spread + i
+		j := TargetIdx + spread + i
 		if i != 0 && 0 <= j && j < len(Segment) {
 			var fullstring string
 			for _, unit := range Segment[j].Units {
@@ -886,7 +892,7 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIndex int, Target in
 	// bonus for the the syl before the space before a long compound word or within a list
 	bonus := 0
 	var NextFullstring string
-	if i:= TargetIndex+spread+1; i < len(Segment) {
+	if i:= TargetIdx+spread+1; i < len(Segment) {
 		for _, unit := range Segment[i].Units {
 			NextFullstring += unit.Str
 		}

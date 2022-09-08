@@ -1,6 +1,6 @@
 CLI tool to format latin script Pali for chanting in the Thai style.
 
-This program was written with the Makhot style of the Dhammayut order in mind but its output can also be used for the Saṁyok style of the Maha Nikaya order.
+This program was written with the Makhot style of the Dhammayut order in mind but its output can also be used for the Saṁyok style of the Maha Nikaya order with the --samyok argument.
 This program implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
@@ -13,7 +13,7 @@ This program implements the tone rules provided at https://www.dhammatalks.org/e
 - the above mentionned guide does not provide a way to identify syllables which can get the optional low tone therefore this is not implemented
 - optional high tones are disabled by default and *will* result in false positives
 - this program provided here "for posterity" and will not be actively maintained
-- To chant in the Saṁyok style, uncomment  "/\*font-weight: 300;\*/" in the embedded CSS to create a visual difference between long and short syllables.
+- *To chant in the Saṁyok style,* try passing the -samyok flag which will tweak the default CSS to create a visual difference between long and short syllables and remove the orange blocks (which corresponds to pauses in Makhot).
 - keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting is not always accurate!
 
 ### Known issues
@@ -63,6 +63,8 @@ Note that this is an added feature and not a feature of the Makhot style.
         -re string
     	on the fly regular expression deletion. Uses Golang (Google RE2) format.
     	See https://github.com/google/re2/wiki/Syntax, https://regex101.com/
+        -samyok
+    	tweak and optimize default CSS for chanting in the Samyok style
         -t	use raw text instead of HTML for the output file
         -version
     	output version information and exit
