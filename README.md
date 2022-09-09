@@ -12,8 +12,8 @@ This program implements the tone rules provided at https://www.dhammatalks.org/e
 - in the HTML format, no formatting is hardcoded and **all formatting can be changed in the embedded CSS**
 - the above mentionned guide does not provide a way to identify syllables which can get the optional low tone therefore this is not implemented
 - optional high tones are disabled by default and *will* result in false positives
-- this program provided here "for posterity" and will not be actively maintained
-- **To chant in the Saṁyok style,** try passing the -samyok flag which will tweak the default CSS to create a visual difference between long and short syllables and remove the orange blocks (which corresponds to pauses in Makhot).
+- this program is provided here "for posterity" and will not be actively maintained
+- **To chant in the Saṁyok style,** try passing the -samyok flag which will tweak the default CSS to create a visual difference between long and short syllables and remove the orange blocks (which correspond to pauses in Makhot).
 - keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting is not always accurate!
 
 ### Known issues
