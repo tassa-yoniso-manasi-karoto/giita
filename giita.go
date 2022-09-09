@@ -21,7 +21,7 @@ import (
 	"unicode/utf8"
 )
 
-const version = "v1.2.3"
+const version = "v1.2.4"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -62,8 +62,7 @@ var (
 	FrequentOther      = []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
 	IrrelevantTypes    = []int{Punct, Space, Other}
 
-	//Vowels    = []string{"ā", "e", "ī", "o", "ū", "ay", "a", "i", "u"}
-	LongVwls    = []string{"ā", "e", "ī", "o", "ū", "ay"}
+	LongVwls    = []string{"ā", "e", "ī", "o", "ū"} /*, "ay"} too many false positives */
 	ShortVwls   = []string{"a", "i", "u"}
 	VowelTypes  = []int{LongVwl, ShortVwl}
 	reLongVwls  []*regexp.Regexp
@@ -305,55 +304,8 @@ func main() {
 			"This could result in an incomplete chanting text.%s\n",
 			Orange, strings.Count(src, "...")+strings.Count(src, "…"), ANSIReset)
 	}
-	// As a consequence of putting the 2 characters consonants/vowels at
-	// the beginning of the the reference consonants/vowels arrays, this
-	// parser performs a blind greedy matching.
-	// There is however one exception where this isn't desired:
-	// the "ay" long vowel versus a "a" short vowel followed by a "y" consonant.
-	// This script tries to distinguish the two by assessing if a "ay" would
-	// result in a syllable imbalance in the next syllable.
 	RawUnits := Parser(src)
 	Syllables := SyllableBuilder(RawUnits)
-	RawUnits = []UnitType{}
-	SkipNext := false
-	for h, Syllable := range Syllables {
-		if SkipNext {
-			SkipNext = false
-			continue
-		}
-		for _, unit := range Syllable.Units {
-			var (
-				ok      bool
-				NextSyl SyllableType
-			)
-			if strings.ToLower(unit.Str) != "ay" {
-				ok = true
-			} else if h+1 > len(Syllables) {
-				ok = true
-			} else {
-				NextSyl = Syllables[h+1]
-				VwlNum, ConsNum := NextSyl.Describe()
-				if VwlNum == 1 && ConsNum == 0 {
-				} else if VwlNum == 2 {
-				} else {
-					ok = true
-				}
-			}
-			if !ok {
-				// preserves the capital letter if there is one
-				y := UnitType{Str: unit.Str[1:2], Type: Cons}
-				unit = UnitType{Str: unit.Str[:1], Type: ShortVwl}
-				nxtRpl := append([]UnitType{y}, NextSyl.Units...)
-				rpl := append([]UnitType{unit}, nxtRpl...)
-				RawUnits = append(RawUnits, rpl...)
-				SkipNext = true
-			} else {
-				RawUnits = append(RawUnits, unit)
-			}
-		}
-	}
-	// units have been corrected, just rebuild from scratch
-	Syllables = SyllableBuilder(RawUnits)
 	Syllables = SetTones(Syllables)
 	if *wantHint != 0 {
 		Segments := SegmentBuilder(Syllables)
