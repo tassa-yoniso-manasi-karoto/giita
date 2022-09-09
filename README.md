@@ -1,6 +1,7 @@
 CLI tool to format latin script Pali for chanting in the Thai style.
 
-This program was written with the Makhot style of the Dhammayut order in mind but with the *--samyok* flag its output can also be used for the Saṁyok style of the Maha Nikaya order.
+This program was written with the Makhot style of the Dhammayut order in mind but with the *--samyok* flag its output can also be used for the Saṁyok style of the Maha Nikaya order. You may also use the *-css* flag to pass personalized CSS.
+
 This program implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
@@ -9,7 +10,7 @@ This program implements the tone rules provided at https://www.dhammatalks.org/e
 ### Please note:
 - the **input file needs to be UTF-8 encoded**. Windows users, especially prior to windows 10, should be aware of this.
 - without arguments, giita will process the "input.txt" file located in the folder of executable and output it there in a "output.htm" with HTML formatting
-- in the HTML format, no formatting is hardcoded and **all formatting can be changed in the embedded CSS**
+- in the HTML format, no formatting is hardcoded and **_all_ formatting can be changed through CSS**
 - the above mentionned guide does not provide a way to identify syllables which can get the optional low tone therefore this is not implemented
 - optional high tones are disabled by default and *will* result in false positives
 - this program is provided here "for posterity" and will not be actively maintained
