@@ -98,6 +98,7 @@ body {
   font-size: %dpx;
   line-height: 1.4em;
   letter-spacing: -0.03em;
+  word-spacing: 0.30em;
 }
 
 .w {
@@ -358,9 +359,6 @@ func main() {
 				buf.WriteString(strings.ReplaceAll(unit.Str, "\n", newline))
 			} else if reSpace.MatchString(unit.Str) {
 				buf.WriteString(" ")
-				if wantHtml {
-					buf.WriteString("&nbsp;")
-				}
 			} else if rePunc.MatchString(unit.Str) && reIsNotExceptPunct.MatchString(unit.Str) {
 				if wantHtml {
 					buf.WriteString(html.EscapeString(unit.Str) + "<span class=punct></span>")
