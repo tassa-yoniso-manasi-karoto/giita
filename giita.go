@@ -138,6 +138,7 @@ body {
 .comment {
   background: lightgrey;
   font-style: italic;
+  word-spacing: normal;
 }
 
 .optionalhigh{
