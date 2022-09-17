@@ -21,7 +21,7 @@ import (
 	"unicode/utf8"
 )
 
-const version = "v1.2.5"
+const version = "v1.2.6"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -97,8 +97,8 @@ var (
 body {
   font-size: %dpx;
   line-height: 1.4em;
-  letter-spacing: -0.03em;
-  word-spacing: 0.30em;
+  letter-spacing: -0.04em;
+  word-spacing: 0.40em;
 }
 
 .w {
@@ -107,6 +107,7 @@ body {
 
 .s::before{
   content: "⸱";
+  color: #646464;
 }
 
 .punct::after{
@@ -229,11 +230,11 @@ func main() {
 	}
 	CSS = fmt.Sprintf(CSS, *wantFontSize)
 	if *debugRaw != "" {
+		suffix := parseDbg(*debugRaw)
 		dat, err := os.ReadFile(CurrentDir + "/debug.css")
 		if wantDebug.CSS && !errors.Is(err, fs.ErrNotExist) {
 			CSS = string(dat)
 		}
-		suffix := parseDbg(*debugRaw)
 		if wantDebug.Perf {
 			f2, _ := os.Create("cpu" + suffix + ".prof")
 			pprof.StartCPUProfile(f2)
@@ -257,7 +258,8 @@ func main() {
 	}
 	if *wantDark {
 		page = strings.Replace(page, "body {", "body {\n  background: black;\n  color: white;", 1)
-		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";", ".s::before{\n  content: \"⸱\";\n  color: #858585;", 1)
+		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";\n  color: #646464;",
+			".s::before{\n  content: \"⸱\";\n  color: #858585;", 1)
 		page = strings.Replace(page, ".comment {\n  background: lightgrey;", ".comment {\n  background: darkgrey;", 1)
 	}
 	if *UserCSSPath != "" {
@@ -594,7 +596,7 @@ func (Segment SegmentType) MakeHint(i int, SegmentProcessed *int) SegmentType {
 	// TargetIdx is the corresponding position expressed as a regular array index.
 	// MaxSpread is also expressed in array increments, not in beats, and corresponds to the radius, not the diameter.
 	Target := 22
-	MaxSpread := 3
+	MaxSpread := 4
 	//if wantDebug.Hint { fmt.Printf("BeatsTotal=%d\tBeatsDone=%d\tTarget=%d\n", BeatsTotal, BeatsDone, Target)}
 	for BeatsTotal-BeatsDone > Target+MaxSpread {
 		// +1 because need 1 more slot for the int that is the target (= the starting point)
@@ -602,8 +604,9 @@ func (Segment SegmentType) MakeHint(i int, SegmentProcessed *int) SegmentType {
 		indexes := make([]int, MaxSpread*2+1)
 		TargetIdx := Segment.FindIdxMatchingBeats(Target + BeatsDone)
 		// if wantDebug.Hint {fmt.Println("TargetIdx", TargetIdx, "Target", Target, "SubsegmentTotal", SubsegmentTotal)}
-		for sp, idx := -MaxSpread, 0; sp <= MaxSpread; sp++ {
-			if 0 <= Target+sp && Target+sp < len(Segment) {
+		idx := 0
+		for sp := -MaxSpread; sp <= MaxSpread; sp++ {
+			if 0 <= TargetIdx+sp && TargetIdx+sp < len(Segment) {
 				vals[idx] = StatsTotal.rate(Segment, TargetIdx, Target, MaxSpread, sp)
 				indexes[idx] = TargetIdx + sp
 				idx += 1
@@ -624,13 +627,11 @@ func (Segment SegmentType) MakeHint(i int, SegmentProcessed *int) SegmentType {
 					}
 					if j == HighestRatedIdx { fmt.Print(ANSIReset) }
 				}
-				fmt.Printf("\n%sPASSED:%s the index chosen is %d\n", Green, ANSIReset, HighestRatedIdx)
 			}
 			Segment[HighestRatedIdx].Hint = true
 			StatsAtPos := Segment.DescribeUpTo(HighestRatedIdx)
 			BeatsDone = StatsAtPos.Long*2 + StatsAtPos.Short
 			Target = 13
-			MaxSpread = 2
 			if SubsegmentTotal == 1 {
 				*SegmentProcessed += 1
 			}
@@ -740,9 +741,12 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int,
 	//-------------------------------
 	// bonus when likely to be going through a list of items that corresponds to
 	// small words and where punctuation is likely missing
-	// ajjhattikā pathavīdhātu    = 84/19 = 4.42
-	// ajjhattikā ākāsadhātu pt2  = 80/16 = 5.00
-	// akankheyya std formula     = 79/8  = 9.88
+	// pācittiya 60               = 83/20 = 4.15	DESIRED
+	// pācittiya 84               = 68/16 = 4.25	DESIRED	(case of a tiny list embedded in a sentence)
+	// pācittiya 36               = 79/18 = 4.39	?	(case of a tiny list embedded in a sentence)
+	// ajjhattikā pathavīdhātu    = 84/19 = 4.42	DESIRED
+	// ajjhattikā ākāsadhātu pt2  = 80/16 = 5.00	NOT
+	// akankheyya std formula     = 79/8  = 9.88	NOT
 	ratio := float64(beatsTotal)/float64(StatsTotal.Space)
 	if wantDebug.List && spread == 0 {
 		i := 0
@@ -803,7 +807,7 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int,
 			subPenalty := int(float64(MaxSpreadSpace) / -float64(i) * factor)
 			penalty += subPenalty
 			if wantDebug.Rate && subPenalty != 0 {
-				fmt.Printf("\t\t%d due to \"%s\" at index %d (factor %d)",
+				fmt.Printf("\t\t\t%d due to \"%s\" at index %d (factor %d)",
 					-subPenalty, fullstring, i, int(factor))
 				if listMode && factor < 0 { fmt.Print(" ", listMode) }
 				fmt.Print("\n")
@@ -832,9 +836,16 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int,
 	//-------------------------------
 	// penality for a pause close to the end of the segment
 	if i := beatsTotal-beatsAtPos; i < Target+MaxSpread {
+		// arbitrary func that provides the desired values: 5^(Target/0.42*(i+1))
 		// +1 to prevent a zero division panic. 0.42 = finetuned = careful
 		penalty := int(math.Pow(5.0, float64(Target)/(float64(i+1.0)*0.42)))
 		score -= penalty
+		if penalty < 0 {
+			if wantDebug.Rate {
+				fmt.Println("\t[rate] Border Penalty: Aborting due to overflow")
+			}
+			return 0
+		}
 		if wantDebug.Rate {
 			fmt.Println("\t[rate] Border Penalty of", -penalty)
 		}
@@ -856,13 +867,19 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int,
 		}
 	}
 	//-------------------------------
-	if spread < 0 {
-		spread = -spread
-	}
-	penalty = spread * 8
-	score -= penalty
-	if wantDebug.Rate {
-		fmt.Println("\t[rate] Spread Penalty of", -penalty)
+	if spread != 0 {
+		if spread < 0 {
+			spread = -spread
+		}
+		x := float64(spread)
+		// arbitrary func that provides the desired values 12x³−66x²+122x−60
+		// 		1→8     2→16     3→35     4→140
+		// w/ this it's technically possible to further increase MaxSpread (untested)
+		penalty = int(12.0*math.Pow(x, 3)-66.0*math.Pow(x, 2)+122.0*x-60)
+		score -= penalty
+		if wantDebug.Rate {
+			fmt.Printf("\t[rate] Spread Penalty of %d (spread=%d)\n", -penalty, spread)
+		}
 	}
 	if wantDebug.Rate {
 		fmt.Println("score", score)
