@@ -1,41 +1,41 @@
 CLI tool to format latin script Pali for chanting in the Thai style.
 
-This program was written with the Makhot style of the Dhammayut order in mind but with the *--samyok* flag its output can also be used for the Saṁyok style of the Maha Nikaya order. You may also use the *-css* flag to pass personalized CSS.
+This program was written with the Makhot style of the Dhammayut order in mind but with the `--samyok` flag its output can also be used for the Saṁyok style of the Maha Nikaya order. You may also use the `-css` flag to pass personalized CSS.
 
 This program implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
 <p align="center">Try it on CodePen: https://codepen.io/tassa-yoniso-manasi-karoto/pen/poaOedv</p>
 
-### Please note:
+## Please note:
 - the **input file needs to be UTF-8 encoded**. Windows users, especially prior to windows 10, should be aware of this.
 - without arguments, giita will process the "input.txt" file located in the folder of executable and output it there in a "output.htm" with HTML formatting
 - in the HTML format, no formatting is hardcoded and **_all_ formatting can be changed through CSS**
 - the above mentionned guide does not provide a way to identify syllables which can get the optional low tone therefore this is not implemented
 - optional high tones are disabled by default and *will* result in false positives
 - this program is provided here "for posterity" and will not be actively maintained
-- **To chant in the Saṁyok style,** try passing the -samyok flag which will optimize the default CSS for this style
+- **To chant in the Saṁyok style,** try passing the `-samyok` flag which will optimize the default CSS for this style
 - keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting is not always accurate!
 
-### Known issues
+## Known issues
 - ~~ambiguous "ay" cases like "viheṭhayanto" where it could referer either to the "ay" long vowel or an "a" followed by a "y"~~ guṇas could still lead to misidentification of syllables, needs testing
 - non standard syllables embedded in the middle/end of a word : any \*brāhma, \*nhārū, \*nhāyeyya derivates
 
-### Formatting of short/long syllables
+## Formatting of short/long syllables
 By default there is no formatting to help differentiate short and long syllables.
 
-With the *-samyok* flag the long syllables are in bold and the short are thin. This formatting makes it very easy to tell them apart but it impairs readability of whole words a lot.
+With the `-samyok` flag the long syllables are in bold and the short are thin. This formatting makes it very easy to tell them apart but it impairs readability of a word as whole a lot.
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/samyok.webp">
 
 CSS makes it possible to increase the weight *slightly* through the font-weight attribute, however most fonts do not support font-weight other than bold and thin.
 A font that does support all variations possible *and* has full support of IAST characters is noto-fonts. [Download](https://download-directory.github.io/) this [folder](https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf/NotoSans) and install the fonts.
 
-With font-family: "Noto Sans Medium" !important; the long syllables can be formatted differently with little disruption.
+With the `-noto` flag the long syllables can be formatted differently with little disruption.
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/notomedium.webp">
 
-### Hints
+## Hints
 
 You may rarely encounter this formatting, a wavy underline with a vertical bar:
 
@@ -46,7 +46,8 @@ This hint is guaranteed to be on a long syllable. It occurs in sentences with a 
 This is an added feature and not a feature of the Makhot style.
 
 
-### Usage of giita:
+## Usage of giita:
+
         -c string
     	allow comments in input file and specify which characters marks
     	respectively the beginning and the end of a comment, separated
