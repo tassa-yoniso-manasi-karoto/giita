@@ -1,6 +1,6 @@
 CLI tool to format latin script Pali for chanting in the Thai style.
 
-This program was written with the Makhot style of the Dhammayut order in mind but with the `--samyok` flag its output can also be used for the Saṁyok style of the Maha Nikaya order. You may also use the `-css` flag to pass personalized CSS.
+This program was written with the Makhot style of the Dhammayut order in mind but with the `-samyok` flag its output can also be used for the Saṁyok style of the Maha Nikaya order. You may also use the `-css` flag to pass personalized CSS.
 
 This program implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
@@ -24,12 +24,12 @@ This program implements the tone rules provided at https://www.dhammatalks.org/e
 ## Formatting of short/long syllables
 By default there is no formatting to help differentiate short and long syllables.
 
-With the `-samyok` flag the long syllables are in bold and the short are thin. This formatting makes it very easy to tell them apart but it impairs readability of a word as whole a lot.
+With the `-samyok` flag the long syllables are in bold and the short are thin. This formatting makes it very easy to tell them apart but it impairs the readability of a word as whole a lot.
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/samyok.webp">
 
-CSS makes it possible to increase the weight *slightly* through the font-weight attribute, however most fonts do not support font-weight other than bold and thin.
-A font that does support all variations possible *and* has full support of IAST characters is noto-fonts. [Download](https://download-directory.github.io/) this [folder](https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf/NotoSans) and install the fonts.
+CSS makes it possible to increase the weight *slightly* through the font-weight attribute, however most fonts do not support font-weight other than with bold and thin.
+A font that does support all possible variations *and* has full support of IAST characters is noto-fonts. [Download](https://download-directory.github.io/) this [folder](https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf/NotoSans) and install the fonts.
 
 With the `-noto` flag the long syllables can be formatted differently with little disruption. High tones are kept in bold.
 
