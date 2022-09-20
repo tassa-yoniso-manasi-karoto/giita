@@ -31,7 +31,7 @@ With the `-samyok` flag the long syllables are in bold and the short are thin. T
 CSS makes it possible to increase the weight *slightly* through the font-weight attribute, however most fonts do not support font-weight other than bold and thin.
 A font that does support all variations possible *and* has full support of IAST characters is noto-fonts. [Download](https://download-directory.github.io/) this [folder](https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf/NotoSans) and install the fonts.
 
-With the `-noto` flag the long syllables can be formatted differently with little disruption.
+With the `-noto` flag the long syllables can be formatted differently with little disruption. High tones are kept in bold.
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/notomedium.webp">
 
