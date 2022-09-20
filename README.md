@@ -70,6 +70,8 @@ This is an added feature and not a feature of the Makhot style.
     	set how many linebreaks will be created from a single linebreak in
     	the input file. Advisable to use 2 for smartphone/tablet/e-reader.
     	 (default 1)
+        -noto
+    	use noto-fonts and a slightly greater font weight for long syllables
         -o string
     	path of output file
     	 (default: "output.htm" in directory of executable)
