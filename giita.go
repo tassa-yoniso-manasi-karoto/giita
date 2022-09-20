@@ -21,7 +21,7 @@ import (
 	"unicode/utf8"
 )
 
-const version = "v1.2.6"
+const version = "v1.2.7"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -78,14 +78,15 @@ var (
 	HighToneFirstChar = []string{"ch", "th", "ṭh", "kh", "ph", "sm", "s", "h"}
 	OptHighFirstChar  = []string{"v", "bh", "r", "n", "ṇ", "m", "y"}
 
-	wantDebug                                                    debugType
-	CurrentDir                                                   string
-	Orange, Green, ANSIReset                                     string
-	in, out, refCmt, UserCSSPath, UserRe, debugRaw               *string
-	wantNewlineNum, wantFontSize                                 *int
-	wantHint                                                     *float64
-	wantTxt, wantOptionalHigh, wantDark, wantVersion, wantSamyok *bool
-	wantHtml                                                     = true
+	wantDebug                                        debugType
+	CurrentDir                                       string
+	Orange, Green, ANSIReset                         string
+	in, out, refCmt, UserCSSPath, UserRe, debugRaw   *string
+	wantNewlineNum, wantFontSize                     *int
+	wantHint                                         *float64
+	wantTxt, wantOptionalHigh, wantDark, wantVersion *bool
+	wantSamyok, wantNoto                             *bool
+	wantHtml                                         = true
 
 	DefaultTemplate = `<!DOCTYPE html> <html><head>
 <meta charset="UTF-8">
@@ -124,7 +125,6 @@ body {
 }
 
 .short {
- /*font-weight: 300;*/
 }
 
 .hint {
@@ -202,7 +202,7 @@ func main() {
 		"\nSee https://github.com/google/re2/wiki/Syntax, https://regex101.com/")
 	refCmt = flag.String("c", "[:]", "allow comments in input file and specify which "+
 		"characters marks\nrespectively the beginning and the end of a comment, separated\nby a colon")
-	debugRaw = flag.String("debug", "", "select desired modules \"perf:hint:rate:parser:css:stats:list\n_pprofFileSuffix\"")
+	debugRaw = flag.String("debug", "", "select desired modules:\n \"perf:hint:rate:parser:css:stats:list_pprofFileSuffix\"")
 	// BOOL
 	wantTxt = flag.Bool("t", false, "use raw text instead of HTML for the output file")
 	wantOptionalHigh = flag.Bool(
@@ -210,6 +210,7 @@ func main() {
 			"high tones with capital letters\njust like true high tones")
 	wantDark = flag.Bool("d", false, "dark mode, will use a white font on a dark background")
 	wantSamyok = flag.Bool("samyok", false, "use CSS optimized for chanting in the Samyok style")
+	wantNoto = flag.Bool("noto", false, "use noto-fonts and a slightly greater font weight for long syllables")
 	wantVersion = flag.Bool("version", false, "output version information and exit")
 	// INT
 	wantNewlineNum = flag.Int("l", 1, "set how many linebreaks will be created from a single "+
@@ -251,16 +252,19 @@ func main() {
 		defer func(){fmt.Println(time.Since(wantDebug.Time))}()
 	}
 	page := fmt.Sprintf(DefaultTemplate, CSS)
-	if *wantSamyok {
-		page = strings.Replace(page, ".long {", ".long {\n font-weight: bold;", 1)
-		page = strings.Replace(page, ".short {\n /*font-weight: 300;*/", ".short {\n font-weight: 300;", 1)
-		page = regexp.MustCompile(`\n\.punct::after[^}]+}\n`).ReplaceAllString(page, "")
-	}
 	if *wantDark {
 		page = strings.Replace(page, "body {", "body {\n  background: black;\n  color: white;", 1)
 		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";\n  color: #646464;",
 			".s::before{\n  content: \"⸱\";\n  color: #858585;", 1)
 		page = strings.Replace(page, ".comment {\n  background: lightgrey;", ".comment {\n  background: darkgrey;", 1)
+	}
+	if *wantSamyok {
+		page = strings.Replace(page, ".long {", ".long {\n font-weight: bold;", 1)
+		page = strings.Replace(page, ".short {", ".short {\n font-weight: 300;", 1)
+		page = regexp.MustCompile(`\n\.punct::after[^}]+}\n`).ReplaceAllString(page, "")
+	} else if *wantNoto {
+		page = strings.Replace(page, "body {", "body {\n  font-family: \"Noto Sans\";", 1)
+		page = strings.Replace(page, ".long {", ".long {\n font-family: \"Noto Sans Medium\" !important;", 1)
 	}
 	if *UserCSSPath != "" {
 		dat, err := os.ReadFile(*UserCSSPath)
