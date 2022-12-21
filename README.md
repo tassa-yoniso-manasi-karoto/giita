@@ -18,7 +18,7 @@ This program implements the tone rules provided at https://www.dhammatalks.org/e
 - keep in mind that syllable delimitations and tone rules can be subject to exceptions and the guidance provided by the formatting is not always accurate!
 
 ## Known issues
-- ~~ambiguous "ay" cases like "viheṭhayanto" where it could referer either to the "ay" long vowel or an "a" followed by a "y"~~ guṇas could still lead to misidentification of syllables, needs testing
+- certain pali grammatical transformations could create unusual syllables, needs testing
 - non standard syllables embedded in the middle/end of a word : any \*brāhma, \*nhārū, \*nhāyeyya derivates
 
 ## Formatting of short/long syllables

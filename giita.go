@@ -13,15 +13,15 @@ import (
 	"os"
 	"path"
 	"regexp"
-	"runtime"
 	"runtime/pprof"
 	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
+	"github.com/gookit/color"
 )
 
-const version = "v1.2.7"
+const version = "v1.2.8"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -191,7 +191,7 @@ func main() {
 	} else {
 		CurrentDir = path.Dir(e)
 	}
-	if runtime.GOOS != "windows" {
+	if color.DetectColorLevel() == color.LevelRgb {
 		Orange, Green, ANSIReset = "\033[38;5;208m", "\033[38;5;2m", "\033[0m"
 	}
 	// STRING
