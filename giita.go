@@ -45,13 +45,16 @@ const (
 	LongVwl = iota
 	ShortVwl
 	Cons
+	ElisionMark
 	Punct
 	Space
 	Other
 )
 
 var (
-	FrequentPunc       = []string{".",",", "\"", "'", "“", "”", "’", ";", "?"}
+	FrequentElisionMark = []string{"’"} //, "'"}
+	
+	FrequentPunc       = []string{".",",", "\"", "“", "”", "’", ";", "?"}
 	rePunc             = regexp.MustCompile(`^\pP+`)
 	reIsNotExceptPunct = regexp.MustCompile(`^[^-“’„"\(\)\[\]«'‘‚-]+`)
 	
@@ -420,8 +423,8 @@ func Parser(src string) (RawUnits []UnitType) {
 		return
 	}
 	var StrMatch, Done float64
-	Lists := [][]string{LongVwls, ShortVwls, C, FrequentPunc, FrequentSpace, FrequentOther}
-	reLists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC, []*regexp.Regexp{rePunc}, []*regexp.Regexp{reSpace}}
+	Lists := [][]string{LongVwls, ShortVwls, C, FrequentElisionMark, FrequentPunc, FrequentSpace, FrequentOther}
+	reLists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC, nil, []*regexp.Regexp{rePunc}, []*regexp.Regexp{reSpace}}
 	// Note: rewrite with generics = func 13% more CPU intensive + more than twice the length
 	// archived in commit bc90408901aed35032ced3ca31e3ea7a8ad2cf2e
 Outerloop:
@@ -467,9 +470,12 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 	for i, unit := range Units {
 		var (
 			PrevUnit, NextUnit, NextNextUnit UnitType
-			notBeforeTwoCons                 bool
-			shouldAccept                     = true
+			NextNextNextUnit                 UnitType
+			notBeforeTwoCons, mustReject     bool
 		)
+		if i+3 < len(Units) {
+			NextNextNextUnit = Units[i+3]
+		}
 		if i+2 < len(Units) {
 			NextNextUnit = Units[i+2]
 		} else {
@@ -486,19 +492,23 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 		}
 		// get a dangling consonant at the end of the word included in
 		// the (currently iterated) previous syllable
-		if NextUnit.Type == Cons && contains(IrrelevantTypes, NextNextUnit.Type) {
-			shouldAccept = false
+		// BUT treat an apostrophe as a vowel sandhi marker when when combining
+		// the following word it creates a consistant syllable
+		if !contains(VowelTypes, NextNextNextUnit.Type) &&
+			(NextUnit.Type == Cons && NextNextUnit.Type > 2 ||
+				unit.Type == Cons && NextUnit.Type == ElisionMark) {
+			mustReject = true
 		}
 		//assume true, overwrite everything after setting exceptions
 		unit.Closing = true
 		// case no further input
 		if i+1 == len(Units) {
 		// case SU-PA-ṬI-pan-no
-		} else if unit.Type == ShortVwl && notBeforeTwoCons && shouldAccept &&
+		} else if unit.Type == ShortVwl && notBeforeTwoCons &&
 			!(strings.ToLower(NextUnit.Str) == "ṁ") &&
 			!(contains(NeverLastPos, NextUnit.Str) && !contains(VowelTypes, NextNextUnit.Type)) {
 		// case HO-mi
-		} else if unit.Type == LongVwl && notBeforeTwoCons && shouldAccept &&
+		} else if unit.Type == LongVwl && notBeforeTwoCons &&
 			!(strings.ToLower(NextUnit.Str) == "ṁ") {
 		// case sag-GAṀ and also "2 consonants in a row" case
 		} else if unit.Type == Cons &&
@@ -513,7 +523,7 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 			Syllable = *new(SyllableType)
 		}
 		Syllable.Units = append(Syllable.Units, unit)
-		if unit.Closing || contains(IrrelevantTypes, NextUnit.Type) && !contains(IrrelevantTypes, unit.Type) {
+		if unit.Closing && !mustReject || contains(IrrelevantTypes, NextUnit.Type) && !contains(IrrelevantTypes, unit.Type) {
 			Syllables = append(Syllables, Syllable)
 			Syllable = *new(SyllableType)
 		}
