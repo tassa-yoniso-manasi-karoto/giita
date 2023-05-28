@@ -84,6 +84,10 @@ This is an added feature and not a feature of the Makhot style.
         -samyok
     	tweak and optimize default CSS for chanting in the Samyok style
         -t	use raw text instead of HTML for the output file
+        -th int
+    	transliterate from Thai script from:
+    	    	1=Pali put down in regular Thai writing
+    	    	2=standard Thai Pali as used in Thai Tipitaka
         -version
     	output version information and exit
 
