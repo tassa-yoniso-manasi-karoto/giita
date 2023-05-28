@@ -4,7 +4,7 @@ This program was written with the Makhot style of the Dhammayut order in mind bu
 
 This program implements the tone rules provided at https://www.dhammatalks.org/ebook_index.html#tone_guide (v151003)
 
-<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/img.webp">
+<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/pic/img.webp">
 <p align="center">Try it on CodePen: https://codepen.io/tassa-yoniso-manasi-karoto/pen/poaOedv</p>
 
 ## Please note:
@@ -26,20 +26,20 @@ By default there is no formatting to help differentiate short and long syllables
 
 With the `-samyok` flag the long syllables are in bold and the short are thin. This formatting makes it very easy to tell them apart but it impairs the readability of a word as whole a lot.
 
-<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/samyok.webp">
+<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/pic/samyok.webp">
 
 CSS makes it possible to increase the weight *slightly* through the font-weight attribute, however most fonts do not support font-weight other than with bold and thin.
 A font that does support all possible variations *and* has full support of IAST characters is noto-fonts. [Download](https://download-directory.github.io/) this [folder](https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf/NotoSans) and install the fonts.
 
 With the `-noto` flag the long syllables can be formatted differently with little disruption. High tones are kept in bold.
 
-<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/notomedium.webp">
+<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/pic/notomedium.webp">
 
 ## Hints
 
 You may rarely encounter this formatting, a wavy underline with a vertical bar:
 
-<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/hints.webp">
+<img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/pic/hints.webp">
 
 This hint is guaranteed to be on a long syllable. It occurs in sentences with a long compound word or in enumerations where punctuation is missing, it is a suggested location to make the syllable extra long in order to have the time to read the rest, or, a short pause to catch one's breath.
 

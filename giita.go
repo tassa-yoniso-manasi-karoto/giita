@@ -19,9 +19,10 @@ import (
 	"time"
 	"unicode/utf8"
 	"github.com/gookit/color"
+	pli "github.com/tassa-yoniso-manasi-karoto/pali-transliteration"
 )
 
-const version = "v1.2.9"
+const version = "v1.2.10 prerelease 2"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -85,7 +86,7 @@ var (
 	CurrentDir                                       string
 	Orange, Green, ANSIReset                         string
 	in, out, refCmt, UserCSSPath, UserRe, debugRaw   *string
-	wantNewlineNum, wantFontSize                     *int
+	wantNewlineNum, wantFontSize, wantTHTranslit     *int
 	wantHint                                         *float64
 	wantTxt, wantOptionalHigh, wantDark, wantVersion *bool
 	wantSamyok, wantNoto                             *bool
@@ -210,7 +211,7 @@ func main() {
 	wantTxt = flag.Bool("t", false, "use raw text instead of HTML for the output file")
 	wantOptionalHigh = flag.Bool(
 		"optionalhigh", false, "requires -t, it formats optional "+
-			"high tones with capital letters\njust like true high tones")
+			"high tones with capital letters\njust like true high tones (legacy flag to be removed)")
 	wantDark = flag.Bool("d", false, "dark mode, will use a white font on a dark background")
 	wantSamyok = flag.Bool("samyok", false, "use CSS optimized for chanting in the Samyok style")
 	wantNoto = flag.Bool("noto", false, "use noto-fonts and a slightly greater font weight for long syllables")
@@ -223,7 +224,10 @@ func main() {
 	wantHint = flag.Float64("hint", 4.5, "suggests hints on where to catch one's breath in long compound words or\n"+
 		"list/enumerations missing proper punctuation."+
 			"\nSuperior values increase sensitivity as to what counts as a list."+
-				"\nReasonable range between 4 and 8, disabled with -hint 0.")
+				"\nReasonable range between 4 and 6, disabled with -hint 0.")
+	wantTHTranslit = flag.Int("th", 0, "transliterate from Thai script from:\n"+
+				 "\t1=Pali put down in regular Thai writing\n"+
+				"\t2=standard Thai Pali as used in Thai Tipitaka")
 	flag.Parse()
 	if *wantVersion {
 		fmt.Println("giita", version)
@@ -305,6 +309,7 @@ func main() {
 		cmts = reCmt.FindAllString(src, -1)
 		src = reCmt.ReplaceAllString(src, "𓃰")
 	}
+	src = pli.ThaiToRoman(src, *wantTHTranslit)
 	src = strings.ReplaceAll(src, "ṃ", "ṁ")
 	src = strings.ReplaceAll(src, "Ṃ", "Ṁ")
 	// chunks from long compound words need to be reunited or will be treated as separate
@@ -424,7 +429,7 @@ func Parser(src string) (RawUnits []UnitType) {
 	}
 	var StrMatch, Done float64
 	Lists := [][]string{LongVwls, ShortVwls, C, FrequentElisionMark, FrequentPunc, FrequentSpace, FrequentOther}
-	reLists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC, nil, []*regexp.Regexp{rePunc}, []*regexp.Regexp{reSpace}}
+	reLists := [][]*regexp.Regexp{reLongVwls, reShortVwls, reC, nil, {rePunc}, {reSpace}}
 	// Note: rewrite with generics = func 13% more CPU intensive + more than twice the length
 	// archived in commit bc90408901aed35032ced3ca31e3ea7a8ad2cf2e
 Outerloop:
@@ -742,15 +747,15 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int,
 
 	}
 	var (
-		score = 100
-		listMode = false
-		StatsAtPos = Segment.DescribeUpTo(TargetIdx + spread)
-		beatsTotal = StatsTotal.Long*2 + StatsTotal.Short
-		beatsAtPos = StatsAtPos.Long*2 + StatsAtPos.Short
-		PrevTargetIdx = Segment.FindIdxMatchingBeats(beatsAtPos-Target)
-		NextTargetIdx = Segment.FindIdxMatchingBeats(beatsAtPos+Target)
-		StatsAtPrev = Segment.DescribeUpTo(PrevTargetIdx)
-		StatsAtNext = Segment.DescribeUpTo(NextTargetIdx)
+		score         = 100
+		listMode      = false
+		StatsAtPos    = Segment.DescribeUpTo(TargetIdx + spread)
+		beatsTotal    = StatsTotal.Long*2 + StatsTotal.Short
+		beatsAtPos    = StatsAtPos.Long*2 + StatsAtPos.Short
+		PrevTargetIdx = Segment.FindIdxMatchingBeats(beatsAtPos - Target)
+		NextTargetIdx = Segment.FindIdxMatchingBeats(beatsAtPos + Target)
+		StatsAtPrev   = Segment.DescribeUpTo(PrevTargetIdx)
+		StatsAtNext   = Segment.DescribeUpTo(NextTargetIdx)
 	)
 	//-------------------------------
 	// bonus when likely to be going through a list of items that corresponds to
@@ -776,7 +781,7 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int,
 	}
 	if beatsTotal > 3*Target && ratio < *wantHint {
 		if wantDebug.List && spread == 0 {
-			fmt.Println(Green + "^ IS LIST ^" + ANSIReset)
+			fmt.Println(Green + "↑ IS LIST ↑" + ANSIReset)
 		}
 		if wantDebug.Rate {
 			fmt.Println("\t[rate] List override")
@@ -865,8 +870,7 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int,
 		}
 	}
 	//-------------------------------
-	// bonus for the the syl before the space before a long compound word or within a list
-	bonus := 0
+	// bonus for the the syl before the space either before a long compound word or within a list
 	var NextFullstring string
 	if i:= TargetIdx+spread+1; i < len(Segment) {
 		for _, unit := range Segment[i].Units {
@@ -874,7 +878,7 @@ func (StatsTotal StatsType) rate(Segment SegmentType, TargetIdx int, Target int,
 		}
 	}
 	if strings.Contains(NextFullstring, " ") && (StatsAtNext.Space-StatsAtPos.Space == 1 || listMode)  {
-		bonus = 150
+		bonus := 150
 		score += bonus
 		if wantDebug.Rate {
 			fmt.Println("\t[rate] with one immediately upcomming space Bonus of", bonus)
