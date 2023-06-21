@@ -17,12 +17,13 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"runtime"
 	"unicode/utf8"
 	"github.com/gookit/color"
 	pli "github.com/tassa-yoniso-manasi-karoto/pali-transliteration"
 )
 
-const version = "v1.2.10"
+const version = "v1.2.11 prerelease"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -140,10 +141,15 @@ body {
   color: orangered; /*#5c5c5c;*/
 }
 
-.comment {
+.cmt {
   background: lightgrey;
   font-style: italic;
   word-spacing: normal;
+  font-size: 60%%;
+}
+
+.p {
+  line-height: 1.2em;
 }
 
 .optionalhigh{
@@ -234,7 +240,8 @@ func main() {
 		os.Exit(0)
 	}
 	if len(*refCmt) != 3 {
-		panic("You provided an invalid input of comment marks.")
+		fmt.Println("You provided an invalid input of comment marks.")
+		os.Exit(1)
 	}
 	CSS = fmt.Sprintf(CSS, *wantFontSize)
 	if *debugRaw != "" {
@@ -258,12 +265,13 @@ func main() {
 		wantDebug.Time = time.Now()
 		defer func(){fmt.Println(time.Since(wantDebug.Time))}()
 	}
+	DefaultTemplate += "<!--giita " + version + " " + runtime.GOOS + "/" + runtime.GOARCH + "\n" + strings.Join(os.Args, " ") + "-->\n"
 	page := fmt.Sprintf(DefaultTemplate, CSS)
 	if *wantDark {
 		page = strings.Replace(page, "body {", "body {\n  background: black;\n  color: white;", 1)
 		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";\n  color: #646464;",
 			".s::before{\n  content: \"⸱\";\n  color: #858585;", 1)
-		page = strings.Replace(page, ".comment {\n  background: lightgrey;", ".comment {\n  background: darkgrey;", 1)
+		page = strings.Replace(page, ".cmt {\n  background: lightgrey;", ".cmt {\n  background: #7E7C7C;", 1)
 	}
 	if *wantSamyok {
 		page = strings.Replace(page, ".long {", ".long {\n font-weight: bold;", 1)
@@ -293,9 +301,17 @@ func main() {
 	newline = strings.Repeat(newline, *wantNewlineNum)
 	fmt.Println("In:", *in)
 	fmt.Println("Out:", *out)
+	if *in == *out {
+		color.Warn.Prompt("Overwrite input file? [y/n]:  ")
+		if b := askForConfirmation(); !b {
+			os.Exit(0)
+		}
+	}
 	dat, err := os.ReadFile(*in)
 	if errors.Is(err, fs.ErrNotExist) {
-		fmt.Println(Orange + "Input \"giita -h\" to display the command line usage.\n" + ANSIReset)
+		color.Error.Println("Input file does not exist.")
+		fmt.Println(Orange + "\nInput \"giita -h\" to display the command line usage." + ANSIReset)
+		os.Exit(1)
 	}
 	check(err)
 	src := string(dat)
@@ -303,11 +319,14 @@ func main() {
 		re := regexp.MustCompile(*UserRe)
 		src = re.ReplaceAllString(src, "")
 	}
-	var cmts []string
+	var cmtsPara, cmtsSpan []string
 	if isFlagPassed("c") {
-		reCmt := regexp.MustCompile(fmt.Sprintf(`(?s)%s.*?%s`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3])))
-		cmts = reCmt.FindAllString(src, -1)
-		src = reCmt.ReplaceAllString(src, "𓃰")
+		reCmtSpan := regexp.MustCompile(fmt.Sprintf(`(?s)%s.*?%s`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3])))
+		reCmtPara := regexp.MustCompile(fmt.Sprintf(`(?sm)^%s.*?%s$`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3])))
+		cmtsPara = reCmtPara.FindAllString(src, -1)
+		src = reCmtPara.ReplaceAllString(src, "𐂂")
+		cmtsSpan = reCmtSpan.FindAllString(src, -1)
+		src = reCmtSpan.ReplaceAllString(src, "𓃰")
 	}
 	src = pli.ThaiToRoman(src, *wantTHTranslit)
 	src = strings.ReplaceAll(src, "ṃ", "ṁ")
@@ -405,10 +424,17 @@ func main() {
 	}
 	outstr := buf.String()
 	if isFlagPassed("c") {
-		for _, cmt := range cmts {
+		for _, cmt := range cmtsPara {
 			if wantHtml {
 				cmt = html.EscapeString(cmt)
-				cmt = "<span class=comment>" + cmt + "</span>"
+				cmt = "<p class=\"cmt p\">" + cmt + "</p>"
+			}
+			outstr = strings.Replace(outstr, "𐂂", cmt, 1)
+		}
+		for _, cmt := range cmtsSpan {
+			if wantHtml {
+				cmt = html.EscapeString(cmt)
+				cmt = "<span class=cmt>" + cmt + "</span>"
 			}
 			outstr = strings.Replace(outstr, "𓃰", cmt, 1)
 		}
@@ -984,5 +1010,16 @@ func isFlagPassed(name string) (found bool) {
 		}
 	})
 	return
+}
+
+func askForConfirmation() bool {
+	var response string
+	_, _ = fmt.Scanln(&response)
+	switch strings.ToLower(response) {
+	case "y", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
