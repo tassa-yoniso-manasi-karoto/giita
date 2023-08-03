@@ -322,7 +322,7 @@ func main() {
 	var cmtsPara, cmtsSpan []string
 	if isFlagPassed("c") {
 		reCmtSpan := regexp.MustCompile(fmt.Sprintf(`(?s)%s.*?%s`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3])))
-		reCmtPara := regexp.MustCompile(fmt.Sprintf(`(?sm)^%s.*?%s$`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3])))
+		reCmtPara := regexp.MustCompile(fmt.Sprintf(`(?sm)^%s[^%s]*?%s$`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3]), regexp.QuoteMeta((*refCmt)[2:3])))
 		cmtsPara = reCmtPara.FindAllString(src, -1)
 		src = reCmtPara.ReplaceAllString(src, "𐂂")
 		cmtsSpan = reCmtSpan.FindAllString(src, -1)
