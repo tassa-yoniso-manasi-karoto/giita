@@ -19,11 +19,12 @@ import (
 	"time"
 	"runtime"
 	"unicode/utf8"
+	
 	"github.com/gookit/color"
 	pli "github.com/tassa-yoniso-manasi-karoto/pali-transliteration"
 )
 
-const version = "v1.2.11"
+const version = "v1.2.12 prerelease"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -90,10 +91,11 @@ var (
 	wantNewlineNum, wantFontSize, wantTHTranslit     *int
 	wantHint                                         *float64
 	wantTxt, wantOptionalHigh, wantDark, wantVersion *bool
-	wantSamyok, wantNoto                             *bool
+	wantSamyok, wantNoto, wantCapital                *bool
 	wantHtml                                         = true
 
 	DefaultTemplate = `<!DOCTYPE html> <html><head>
+<title>%s</title>
 <meta charset="UTF-8">
 <style>
 %s
@@ -222,6 +224,7 @@ func main() {
 	wantSamyok = flag.Bool("samyok", false, "use CSS optimized for chanting in the Samyok style")
 	wantNoto = flag.Bool("noto", false, "use noto-fonts and a slightly greater font weight for long syllables")
 	wantVersion = flag.Bool("version", false, "output version information and exit")
+	wantCapital = flag.Bool("capital", false, "enforce capital letter at the beginning of each segment")
 	// INT
 	wantNewlineNum = flag.Int("l", 1, "set how many linebreaks will be created from a single "+
 		"linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
@@ -266,7 +269,8 @@ func main() {
 		defer func(){fmt.Println(time.Since(wantDebug.Time))}()
 	}
 	DefaultTemplate += "<!--giita " + version + " " + runtime.GOOS + "/" + runtime.GOARCH + "\n" + strings.Join(os.Args, " ") + "-->\n"
-	page := fmt.Sprintf(DefaultTemplate, CSS)
+	title := strings.TrimSuffix(path.Base(*in), ".txt")
+	page := fmt.Sprintf(DefaultTemplate, title, CSS)
 	if *wantDark {
 		page = strings.Replace(page, "body {", "body {\n  background: black;\n  color: white;", 1)
 		page = strings.Replace(page, ".s::before{\n  content: \"⸱\";\n  color: #646464;",
@@ -322,8 +326,12 @@ func main() {
 	var cmtsPara, cmtsSpan []string
 	if isFlagPassed("c") {
 		reCmtSpan := regexp.MustCompile(fmt.Sprintf(`(?s)%s.*?%s`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3])))
-		reCmtPara := regexp.MustCompile(fmt.Sprintf(`(?sm)^%s[^%s]*?%s$`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3]), regexp.QuoteMeta((*refCmt)[2:3])))
+		// newline "\n" included won't be replaced as a <br>, accordingly \n{0,2} makes up for the newline added by the <p> tag
+		reCmtPara := regexp.MustCompile(fmt.Sprintf(`(?sm)^ *%s[^%s]*?%s *\n{0,2}$`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3]), regexp.QuoteMeta((*refCmt)[2:3])))
 		cmtsPara = reCmtPara.FindAllString(src, -1)
+		for i, cmtPara := range cmtsPara {
+			cmtsPara[i], _ = strings.CutPrefix(cmtPara, "\n")
+		}
 		src = reCmtPara.ReplaceAllString(src, "𐂂")
 		cmtsSpan = reCmtSpan.FindAllString(src, -1)
 		src = reCmtSpan.ReplaceAllString(src, "𓃰")
@@ -427,7 +435,7 @@ func main() {
 		for _, cmt := range cmtsPara {
 			if wantHtml {
 				cmt = html.EscapeString(cmt)
-				cmt = "<p class=\"cmt p\">" + cmt + "</p>"
+				cmt = "\n<p class=\"cmt p\">" + cmt + "</p>"
 			}
 			outstr = strings.Replace(outstr, "𐂂", cmt, 1)
 		}
@@ -615,9 +623,15 @@ func SetTones(Syllables []SyllableType) []SyllableType {
 
 func SegmentBuilder(Syllables []SyllableType) (Segments []SegmentType) {
 	Segment := *new(SegmentType)
+	capital := true
 	for _, Syllable := range Syllables {
 		stop := false
 		for _, unit := range Syllable.Units {
+			if capital && *wantCapital {				
+				r, _ := utf8.DecodeRuneInString(unit.Str)
+				Syllable.Units[0].Str = strings.ToUpper(string(r))
+				capital = false
+			}
 			if strings.Contains(unit.Str, "\n") ||
 				rePunc.MatchString(unit.Str) && reIsNotExceptPunct.MatchString(unit.Str) {
 				stop = true
@@ -627,6 +641,7 @@ func SegmentBuilder(Syllables []SyllableType) (Segments []SegmentType) {
 		if stop {
 			Segments = append(Segments, Segment)
 			Segment = *new(SegmentType)
+			capital = true
 		}
 	}
 	return
