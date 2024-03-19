@@ -18,13 +18,15 @@ import (
 	"strings"
 	"time"
 	"runtime"
+	"strconv"
 	"unicode/utf8"
 	
 	"github.com/gookit/color"
+	//"github.com/k0kubun/pp"
 	pli "github.com/tassa-yoniso-manasi-karoto/pali-transliteration"
 )
 
-const version = "v1.2.12"
+const version = "v1.2.13 prerelease"
 
 // const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
 
@@ -33,15 +35,10 @@ const version = "v1.2.12"
 
 /*
 TODO
+	check for nested comments marks i.e. likely human errors
 	make test files
-COULD
 	pretty print? (i.e. wrap quotes nicely)
-	diff against ↓ to find exceptions (all long falling tones?): METta, viMOKkha, sometime also pāṭiMOKkhe
-	https://www.dhammatalks.org/books/ChantingGuide/Section0000.html,
-	use something like /digitalpalireader/_dprhtml/js/analysis_function.js to
-		(1) improve accuracy of syllable splitting;
-		(2) be able to prefer splitting really long compound words at word boundaries
-		(would require a Go rewrite so that's not going to happen)
+	https://github.com/caddyserver/caddy ship mini http server someday
 */
 
 const (
@@ -59,7 +56,7 @@ var (
 	
 	FrequentPunc       = []string{".",",", "\"", "“", "”", "’", ";", "?"}
 	rePunc             = regexp.MustCompile(`^\pP+`)
-	reIsNotExceptPunct = regexp.MustCompile(`^[^-“’„"\(\)\[\]«'‘‚-]+`)
+	reIsExceptPunct    = regexp.MustCompile(`^[-“’„"\(\)\[\]«'‘‚-]+`)
 	
 	// third index, NO-BREAK SPACE [NBSP], isn't part of "\s"
 	FrequentSpace      = []string{" ", "\n", " "}
@@ -91,9 +88,11 @@ var (
 	wantNewlineNum, wantFontSize, wantTHTranslit     *int
 	wantHint                                         *float64
 	wantTxt, wantOptionalHigh, wantDark, wantVersion *bool
-	wantSamyok, wantNoto, wantCapital                *bool
+	wantSamyok, wantNoto, wantCapital, wantTrain     *bool
 	wantHtml                                         = true
 
+	CmtParaMark = "𐂂"
+	CmtSpanMark = "𓃰"
 	DefaultTemplate = `<!DOCTYPE html> <html><head>
 <title>%s</title>
 <meta charset="UTF-8">
@@ -101,6 +100,17 @@ var (
 %s
 </style></head>
 <body>`
+	hideCSS = `
+.mainp {
+    margin: 0;
+    padding: 0;
+    color: black;
+    background-color: black;
+}
+
+.mainp:hover, .mainp:hover {
+  color: white;
+}`
 	CSS = `
 body {
   font-size: %dpx;
@@ -108,6 +118,8 @@ body {
   letter-spacing: -0.04em;
   word-spacing: 0.40em;
 }
+
+%s
 
 .w {
   white-space: nowrap;
@@ -161,8 +173,8 @@ body {
 )
 
 type debugType struct {
-	Perf, Hint, Rate, Parser, Stats, CSS, List bool
-	Time                                       time.Time
+	Perf, Hint, Rate, Parser, Stats, CSS, List, Units bool
+	Time                                              time.Time
 }
 
 type UnitType struct {
@@ -177,9 +189,13 @@ type SyllableType struct {
 	IsLong, NotStopped, HasHighToneFirstChar bool
 	Irrelevant, Hint                         bool
 	TrueHigh, OptionalHigh                   bool
+	ClosingPara                              bool
 }
 
 type SegmentType []SyllableType
+
+type ParagraphType []SegmentType
+
 
 func init() {
 	for _, ShortVwl := range ShortVwls {
@@ -225,6 +241,7 @@ func main() {
 	wantNoto = flag.Bool("noto", false, "use noto-fonts and a slightly greater font weight for long syllables")
 	wantVersion = flag.Bool("version", false, "output version information and exit")
 	wantCapital = flag.Bool("capital", false, "enforce capital letter at the beginning of each segment")
+	wantTrain = flag.Bool("train", false, "training version")
 	// INT
 	wantNewlineNum = flag.Int("l", 1, "set how many linebreaks will be created from a single "+
 		"linebreak in\nthe input file. Advisable to use 2 for smartphone/tablet/e-reader.\n")
@@ -246,7 +263,10 @@ func main() {
 		fmt.Println("You provided an invalid input of comment marks.")
 		os.Exit(1)
 	}
-	CSS = fmt.Sprintf(CSS, *wantFontSize)
+	if *wantTrain == false {
+		hideCSS = ""
+	}
+	CSS = fmt.Sprintf(CSS, *wantFontSize, hideCSS)
 	if *debugRaw != "" {
 		suffix := parseDbg(*debugRaw)
 		dat, err := os.ReadFile(CurrentDir + "/debug.css")
@@ -327,14 +347,14 @@ func main() {
 	if isFlagPassed("c") {
 		reCmtSpan := regexp.MustCompile(fmt.Sprintf(`(?s)%s.*?%s`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3])))
 		// newline "\n" included won't be replaced as a <br>, accordingly \n{0,2} makes up for the newline added by the <p> tag
-		reCmtPara := regexp.MustCompile(fmt.Sprintf(`(?sm)^ *%s[^%s]*?%s *\n{0,2}$`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3]), regexp.QuoteMeta((*refCmt)[2:3])))
+		reCmtPara := regexp.MustCompile(fmt.Sprintf(`(?sm)^ *%s[^%s]*?%s *\n{0,2}`, regexp.QuoteMeta((*refCmt)[0:1]), regexp.QuoteMeta((*refCmt)[2:3]), regexp.QuoteMeta((*refCmt)[2:3])))
 		cmtsPara = reCmtPara.FindAllString(src, -1)
-		for i, cmtPara := range cmtsPara {
-			cmtsPara[i], _ = strings.CutPrefix(cmtPara, "\n")
+		for i, CmtPara := range cmtsPara {
+			cmtsPara[i], _ = strings.CutPrefix(CmtPara, "\n")
 		}
-		src = reCmtPara.ReplaceAllString(src, "𐂂")
+		src = reCmtPara.ReplaceAllString(src, CmtParaMark)
 		cmtsSpan = reCmtSpan.FindAllString(src, -1)
-		src = reCmtSpan.ReplaceAllString(src, "𓃰")
+		src = reCmtSpan.ReplaceAllString(src, CmtSpanMark)
 	}
 	src = pli.ThaiToRoman(src, *wantTHTranslit)
 	src = strings.ReplaceAll(src, "ṃ", "ṁ")
@@ -350,8 +370,8 @@ func main() {
 	RawUnits := Parser(src)
 	Syllables := SyllableBuilder(RawUnits)
 	Syllables = SetTones(Syllables)
+	Segments := SegmentBuilder(Syllables)
 	if *wantHint != 0 {
-		Segments := SegmentBuilder(Syllables)
 		SegmentProcessed := 0
 		for i, Segment := range Segments {
 			Segments[i] = Segment.MakeHint(i, &SegmentProcessed)
@@ -360,70 +380,88 @@ func main() {
 			fmt.Printf("[hint] added hint(s) in %.1f%% of all segments (%d/%d)\n",
 				float64(SegmentProcessed)/float64(len(Segments))*100, int(SegmentProcessed), len(Segments))
 		}
-		Syllables = []SyllableType{}
-		for _, Segment := range Segments {
-			Syllables = append(Syllables, []SyllableType(Segment)...)
+	}
+	// https://stackoverflow.com/questions/28615544/how-to-create-spoiler-text ßßß
+	var Paragraphs []ParagraphType
+	var Paragraph ParagraphType
+	for i, Segment := range Segments {
+		Paragraph = append(Paragraph, Segment)
+		if Segment.IsClosingPara() || i == len(Segments)-1 {
+			Paragraphs = append(Paragraphs, Paragraph)
+			Paragraph = *new(ParagraphType)
 		}
 	}
-	// TODO Rewrite this writer with Segment instead of Syllables, <div> instead of <br>
+	// TODO remove buffer usage because comments require postprocessing
 	buf := bytes.NewBufferString(page)
 	span := "<span class=\"%s\">"
 	openword := false
-	for h, Syllable := range Syllables {
-		class := ""
-		if wantHtml {
-			if !Syllable.Irrelevant && !openword {
-				fmt.Fprintf(buf, span, "w")
-				openword = true
-			} else if Syllable.Irrelevant && openword {
-				buf.WriteString("</span>")
-				openword = false
-			}
-			class += Syllable.whichTone()
-			if Syllable.IsLong {
-				class = appendClass(class, "long")
-			} else if !Syllable.Irrelevant {
-				class = appendClass(class, "short")
-			}
-			if Syllable.Hint {
-				class = appendClass(class, "hint")
-			}
-			if class != "" {
-				fmt.Fprintf(buf, span, class)
-			}
-		}
-		/*if Syllable.Hint {
-			buf.WriteString(html.EscapeString("@"))
-		}*/
-		for _, unit := range Syllable.Units {
-			if strings.Contains(unit.Str, "\n") {
-				// FIXME one empty newline = two \n, so -l 2 is a factor 2 operation, need a smaller step
-				buf.WriteString(strings.ReplaceAll(unit.Str, "\n", newline))
-			} else if reSpace.MatchString(unit.Str) {
-				buf.WriteString(" ")
-			} else if rePunc.MatchString(unit.Str) && reIsNotExceptPunct.MatchString(unit.Str) {
+	for _, Paragraph := range Paragraphs {
+		buf.WriteString("<p class=mainp>")
+		for _, Segment := range Paragraph {
+			Syllables = []SyllableType(Segment)
+			for h, Syllable := range Syllables {
+				class := ""
 				if wantHtml {
-					buf.WriteString(html.EscapeString(unit.Str) + "<span class=punct></span>")
-				} else {
-					buf.WriteString(unit.Str + "█")
+					// TODO Implements Word type in addition to Segment
+					if Syllable.Irrelevant && openword {
+						buf.WriteString("</span>")
+						openword = false
+						// TODO add counter for "openword" and add <span class=spoiler>
+					} else if !Syllable.Irrelevant && !openword {
+						fmt.Fprintf(buf, span, "w")
+						openword = true
+					}
+					if Syllable.ClosingPara {
+						buf.WriteString("</p>")
+					}
+					class += Syllable.whichTone()
+					if Syllable.IsLong {
+						class = appendClass(class, "long")
+					} else if !Syllable.Irrelevant {
+						class = appendClass(class, "short")
+					}
+					if Syllable.Hint {
+						class = appendClass(class, "hint")
+					}
+					if class != "" {
+						fmt.Fprintf(buf, span, class)
+					}
+					// TODO closs span class spoiler at the end of the paragraph
 				}
-			} else {
-				if wantHtml {
-					buf.WriteString(html.EscapeString(unit.Str))
-				} else {
-					buf.WriteString(unit.Str)
+				for _, unit := range Syllable.Units {
+					if strings.Contains(unit.Str, "\n") {
+						// FIXME one empty newline = two \n, so -l 2 is a factor 2 operation, need a smaller step
+						buf.WriteString(strings.ReplaceAll(unit.Str, "\n", newline))
+					} else if reSpace.MatchString(unit.Str) {
+						buf.WriteString(" ")
+					} else if rePunc.MatchString(unit.Str) && !reIsExceptPunct.MatchString(unit.Str) {
+						if wantHtml {
+							buf.WriteString(html.EscapeString(unit.Str) + "<span class=punct></span>")
+						} else {
+							buf.WriteString(unit.Str + "█")
+						}
+					} else {
+						if wantHtml {
+							if wantDebug.Units {
+								buf.WriteString(`<dfn title="`+ strconv.FormatBool(unit.IsRelevant())+ `">`+ html.EscapeString(unit.Str) + `</dfn>`)
+							} else {
+								buf.WriteString(html.EscapeString(unit.Str))
+							}
+						} else {
+							buf.WriteString(unit.Str)
+						}
+					}
 				}
-			}
-		}
-		if class != "" && wantHtml {
-			buf.WriteString("</span>")
-		}
-		//-----
-		if h+1 < len(Syllables) {
-			lastUnit := Syllable.Units[len(Syllable.Units)-1]
-			NextSylFirstUnit := Syllables[h+1].Units[0]
-			if !contains(IrrelevantTypes, lastUnit.Type) && !contains(IrrelevantTypes, NextSylFirstUnit.Type) {
-				buf.WriteString(separator)
+				if class != "" && wantHtml {
+					buf.WriteString("</span>")
+				}
+				if h < len(Syllables)-1 {
+					lastUnit := Syllable.Units[len(Syllable.Units)-1]
+					NextSylFirstUnit := Syllables[h+1].Units[0]
+					if lastUnit.IsRelevant() && NextSylFirstUnit.IsRelevant() {
+						buf.WriteString(separator)
+					}
+				}
 			}
 		}
 	}
@@ -437,7 +475,7 @@ func main() {
 				cmt = html.EscapeString(cmt)
 				cmt = "\n<p class=\"cmt p\">" + cmt + "</p>"
 			}
-			outstr = strings.Replace(outstr, "𐂂", cmt, 1)
+			outstr = strings.Replace(outstr, CmtParaMark, cmt, 1)
 		}
 		for _, cmt := range cmtsSpan {
 			if wantHtml {
@@ -556,18 +594,26 @@ func SyllableBuilder(Units []UnitType) []SyllableType {
 		} else {
 			unit.Closing = false
 		}
-		//----
-		if contains(IrrelevantTypes, PrevUnit.Type) && !contains(IrrelevantTypes, unit.Type) {
+		if !PrevUnit.IsRelevant() && unit.IsRelevant() {
 			Syllables = append(Syllables, Syllable)
 			Syllable = *new(SyllableType)
 		}
 		Syllable.Units = append(Syllable.Units, unit)
-		if unit.Closing && !mustReject || contains(IrrelevantTypes, NextUnit.Type) && !contains(IrrelevantTypes, unit.Type) {
+		if unit.Closing && !mustReject || !NextUnit.IsRelevant() && unit.IsRelevant() {
 			Syllables = append(Syllables, Syllable)
 			Syllable = *new(SyllableType)
 		}
 	}
 	return Syllables
+}
+
+
+func (unit UnitType) IsRelevant() (b bool) {
+	b = !contains(IrrelevantTypes, unit.Type)
+	if !b && reIsExceptPunct.MatchString(unit.Str) {
+		b = true
+	}
+	return
 }
 
 func SetTones(Syllables []SyllableType) []SyllableType {
@@ -578,9 +624,7 @@ func SetTones(Syllables []SyllableType) []SyllableType {
 			if len(Syllable.Units) > i+1 {
 				NextUnit = Syllable.Units[i+1]
 			}
-			if contains(IrrelevantTypes, unit.Type) {
-				Syllable.Irrelevant = true
-			}
+			Syllable.Irrelevant = !unit.IsRelevant()
 			if (unit.Type == ShortVwl && strings.ToLower(NextUnit.Str) == "ṁ") ||
 				(unit.Type == ShortVwl && NextUnit.Type == Cons && NextUnit.Closing) ||
 					(unit.Type == LongVwl) {
@@ -624,7 +668,7 @@ func SetTones(Syllables []SyllableType) []SyllableType {
 func SegmentBuilder(Syllables []SyllableType) (Segments []SegmentType) {
 	Segment := *new(SegmentType)
 	capital := true
-	for _, Syllable := range Syllables {
+	for i, Syllable := range Syllables {
 		stop := false
 		for _, unit := range Syllable.Units {
 			if capital && *wantCapital {				
@@ -633,18 +677,44 @@ func SegmentBuilder(Syllables []SyllableType) (Segments []SegmentType) {
 				capital = false
 			}
 			if strings.Contains(unit.Str, "\n") ||
-				rePunc.MatchString(unit.Str) && reIsNotExceptPunct.MatchString(unit.Str) {
+				rePunc.MatchString(unit.Str) && !reIsExceptPunct.MatchString(unit.Str) {
 				stop = true
 			}
 		}
 		Segment = append(Segment, Syllable)
-		if stop {
+		if stop || i == len(Syllables)-1 {
 			Segments = append(Segments, Segment)
 			Segment = *new(SegmentType)
 			capital = true
 		}
 	}
 	return
+}
+
+func (Syllable *SyllableType) String() (s string) {
+	for _, Unit := range Syllable.Units {
+		s += Unit.Str
+	}
+	return
+}
+
+func (Segment *SegmentType) String() (s string) {
+	for _, Syllable := range *Segment {
+		for _, Unit := range Syllable.Units {
+			s += Unit.Str
+		}
+	}
+	return
+}
+
+func (Segment *SegmentType) IsClosingPara() bool {
+	for _, Syllable := range []SyllableType(*Segment) {
+		if strings.Contains(Syllable.String(), "\n\n") || strings.Contains(Syllable.String(), "\n"+CmtParaMark) {
+			Syllable.ClosingPara = true
+			return true
+		}
+	}
+	return false
 }
 
 func (Segment SegmentType) MakeHint(i int, SegmentProcessed *int) SegmentType {
@@ -1007,6 +1077,8 @@ func parseDbg(debugRaw string) (suffix string) {
 			wantDebug.CSS = true
 		case "list":
 			wantDebug.List = true
+		case "units":
+			wantDebug.Units = true
 		}
 	}
 	return

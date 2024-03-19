@@ -45,6 +45,8 @@ This hint is guaranteed to be on a long syllable. It occurs in sentences with a 
 
 This is an added feature and not a feature of the Makhot style.
 
+**NOTE: This feature is meant as a fallback. It is much better to decompose compound words manually with the Digital Pali Reader or a generative AI like Gemini/ChatGPT.**
+
 
 ## Usage of giita:
 
