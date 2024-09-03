@@ -1,5 +1,3 @@
-// ☸
-
 package main
 
 import (
@@ -26,19 +24,12 @@ import (
 	pli "github.com/tassa-yoniso-manasi-karoto/pali-transliteration"
 )
 
-const version = "v1.2.13 prerelease"
-
-// const reference string = "a-ra-haṁ, abhi-vā-de-mi, su-pa-ṭi-pan-no, sam-bud-dho, svāk-khā-to, tas-sa, met-ta, a-haṁ, ho-mi, a-ve-ro, dham-mo, sam-mā, a-haṁ, kho, khan-dho, Ṭhā-nis-sa-ro, ya-thā, sey-yo, ho-ti, hon-ti, sot-thi, phoṭ-ṭhab-ba, khet-te, ya-thāj-ja, cī-va-raṁ, pa-ri-bhut-taṁ, sa-ra-naṁ, ma-kasa, pa-ṭha-mā-nus-sa-ti, Bha-ga-vā, sam-bud-dhas-sa, kit-ti-sad-do, a-ha-mā-da-re-na, khet-te, A-haṁ bhan-te sam-ba-hu-lā nā-nā-vat-thu-kā-ya pā-cit-ti-yā-yo ā-pat-ti-yo ā-pan-no tā pa-ṭi-de-se-mi. Pas-sa-si ā-vu-so? Ā-ma bhan-te pas-sā-mi. Ā-ya-tiṁ ā-vu-so saṁ-va-rey-yā-si. Sā-dhu suṭ-ṭhu bhan-te saṁ-va-ris-sā-mi."
-
-// NOTE: makasa → "ma-kasa" = presumed to be an exception
-// var test string = "arahaṁ, abhivādemi, supaṭipanno, sambuddho, svākkhāto, tassa, metta, ahaṁ, homi, avero, dhammo, sammā, ahaṁ, kho, khandho, Ṭhānissaro, yathā, seyyo, hoti, honti, sotthi, phoṭṭhabba, khette, yathājja, cīvaraṁ, paribhuttaṁ, saranaṁ, makasa, paṭhamānussati, Bhagavā, sambuddhassa, kittisaddo, ahamādarena, khette, Ahaṁ bhante sambahulā nānāvatthukāya pācittiyāyo āpattiyo āpanno tā paṭidesemi. Passasi āvuso? Āma bhante passāmi. Āyatiṁ āvuso saṁvareyyāsi. Sādhu suṭṭhu bhante saṁvarissāmi."
+const version = "v1.2.13"
 
 /*
 TODO
+	preserve "-" inside words
 	check for nested comments marks i.e. likely human errors
-	make test files
-	pretty print? (i.e. wrap quotes nicely)
-	https://github.com/caddyserver/caddy ship mini http server someday
 */
 
 const (
@@ -60,7 +51,7 @@ var (
 	
 	// third index, NO-BREAK SPACE [NBSP], isn't part of "\s"
 	FrequentSpace      = []string{" ", "\n", " "}
-	reSpace            = regexp.MustCompile(`(?s)^\s+`)
+	reSpace            = regexp.MustCompile(`(?s)^\s+`) // \p{Z}  ← better?
 	
 	FrequentOther      = []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
 	IrrelevantTypes    = []int{Punct, Space, Other}
@@ -300,6 +291,7 @@ func main() {
 	if *wantSamyok {
 		page = strings.Replace(page, ".long {", ".long {\n font-weight: bold;", 1)
 		page = strings.Replace(page, ".short {", ".short {\n font-weight: 300;", 1)
+		page = strings.Replace(page, ".truehigh{", ".truehigh{\n color: yellow;", 1)
 		page = regexp.MustCompile(`\n\.punct::after[^}]+}\n`).ReplaceAllString(page, "")
 	} else if *wantNoto {
 		page = strings.Replace(page, "body {", "body {\n  font-family: \"Noto Sans\";", 1)
@@ -381,7 +373,7 @@ func main() {
 				float64(SegmentProcessed)/float64(len(Segments))*100, int(SegmentProcessed), len(Segments))
 		}
 	}
-	// https://stackoverflow.com/questions/28615544/how-to-create-spoiler-text ßßß
+	// https://stackoverflow.com/questions/28615544/how-to-create-spoiler-text
 	var Paragraphs []ParagraphType
 	var Paragraph ParagraphType
 	for i, Segment := range Segments {
@@ -396,7 +388,9 @@ func main() {
 	span := "<span class=\"%s\">"
 	openword := false
 	for _, Paragraph := range Paragraphs {
-		buf.WriteString("<p class=mainp>")
+		if wantHtml {
+			buf.WriteString("<p class=mainp>")
+		}
 		for _, Segment := range Paragraph {
 			Syllables = []SyllableType(Segment)
 			for h, Syllable := range Syllables {
@@ -529,7 +523,7 @@ Outerloop:
 		r, _ := utf8.DecodeRuneInString(src)
 		char := string(r)
 		RawUnits = append(RawUnits, f(char, &src, Other))
-		if wantDebug.Parser && char != "𓃰" {
+		if wantDebug.Parser && char != CmtParaMark && char != CmtSpanMark {
 			fmt.Printf("'%s': Non-Pali/Unknown Char (%U)\n", char, r)
 		}
 	}
@@ -641,7 +635,8 @@ func SetTones(Syllables []SyllableType) []SyllableType {
 				Syllable.TrueHigh = true
 				if Syllable.TrueHigh && !wantHtml {
 					for k, unit := range Syllable.Units {
-						s := strings.ToUpper(unit.Str)
+						s := unit.Str
+						//s := strings.ToUpper(unit.Str)
 						Syllable.Units[k].Str = s
 					}
 				}
@@ -1062,7 +1057,7 @@ func parseDbg(debugRaw string) (suffix string) {
 		debugRaw = strings.TrimSuffix(debugRaw, suffix)
 	}
 	for _, s := range strings.Split(debugRaw, ":") {
-		switch s {
+		switch strings.ToLower(s) {
 		case "perf":
 			wantDebug.Perf = true
 		case "hint":
@@ -1071,13 +1066,13 @@ func parseDbg(debugRaw string) (suffix string) {
 			wantDebug.Rate = true
 		case "parser":
 			wantDebug.Parser = true
-		case "stats":
+		case "stats", "stat":
 			wantDebug.Stats = true
 		case "css":
 			wantDebug.CSS = true
 		case "list":
 			wantDebug.List = true
-		case "units":
+		case "units", "unit":
 			wantDebug.Units = true
 		}
 	}
