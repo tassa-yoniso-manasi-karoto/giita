@@ -243,8 +243,8 @@ func main() {
 			"\nSuperior values increase sensitivity as to what counts as a list."+
 				"\nReasonable range between 4 and 6, disabled with -hint 0.")
 	wantTHTranslit = flag.Int("th", 0, "transliterate from Thai script from:\n"+
-				 "\t1=Pali put down in regular Thai writing\n"+
-				"\t2=standard Thai Pali as used in Thai Tipitaka")
+				 "\t1=Pali put down in colloquial Thai writing\n"+
+				"\t2=Thai Pali in Pintu style as used in Thai Tipitaka")
 	flag.Parse()
 	if *wantVersion {
 		fmt.Println("giita", version)
