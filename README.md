@@ -37,15 +37,14 @@ With the `-noto` flag the long syllables can be formatted differently with littl
 
 ## Hints
 
+**NOTE: This feature is obsolete now that compound words can be easily be decomposed with by LLM like Claude/ChatGPT/etc**
+
 You may rarely encounter this formatting, a wavy underline with a vertical bar:
 
 <img src="https://github.com/tassa-yoniso-manasi-karoto/giita/blob/main/pic/hints.webp">
 
 This hint is guaranteed to be on a long syllable. It occurs in sentences with a long compound word or in enumerations where punctuation is missing, it is a suggested location to make the syllable extra long in order to have the time to read the rest, or, a short pause to catch one's breath.
 
-This is an added feature and not a feature of the Makhot style.
-
-**NOTE: This feature is meant as a fallback. It is much better to decompose compound words manually with the Digital Pali Reader or a generative AI like Gemini/ChatGPT.**
 
 
 ## Usage of giita:
