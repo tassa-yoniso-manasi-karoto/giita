@@ -22,7 +22,7 @@ import (
 	"github.com/gookit/color"
 	//"github.com/k0kubun/pp"
 	pli "github.com/tassa-yoniso-manasi-karoto/pali-transliteration"
-	. "github.com/tassa-yoniso-manasi-karoto/giita/lib"
+	. "github.com/tassa-yoniso-manasi-karoto/giita/pkg/libgiita"
 )
 
 const version = "v1.2.13"
